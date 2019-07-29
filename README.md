@@ -1,4 +1,4 @@
-Please have a look at the [wiki](https://github.com/obfuscator-llvm/obfuscator/wiki)!
+Please have a look at the [wiki](https://github.com/heroims/obfuscator/wiki)!
 
 Current version: [LLVM-4.0](https://github.com/obfuscator-llvm/obfuscator/tree/llvm-4.0)
 
