@@ -382,7 +382,7 @@ index dedfc81f11bb..c461f79fa3c1 100644
  
  static const Regex DefaultAliasRegex(
 diff --git a/llvm/lib/Passes/PassBuilderPipelines.cpp b/llvm/lib/Passes/PassBuilderPipelines.cpp
-index e838665eb9ce..919fdd59db82 100644
+index e838665eb9ce..9c5fd73df97d 100644
 --- a/llvm/lib/Passes/PassBuilderPipelines.cpp
 +++ b/llvm/lib/Passes/PassBuilderPipelines.cpp
 @@ -127,6 +127,11 @@
@@ -413,28 +413,25 @@ index e838665eb9ce..919fdd59db82 100644
  PipelineTuningOptions::PipelineTuningOptions() {
    LoopInterleaving = true;
    LoopVectorization = true;
-@@ -193,6 +207,20 @@ PipelineTuningOptions::PipelineTuningOptions() {
+@@ -193,6 +207,17 @@ PipelineTuningOptions::PipelineTuningOptions() {
    CallGraphProfile = true;
    MergeFunctions = EnableMergeFunctions;
    EagerlyInvalidateAnalyses = EnableEagerlyInvalidateAnalyses;
 +
 +#if defined(LLVM_ENABLE_NEW_PASS_MANAGER) && LLVM_ENABLE_NEW_PASS_MANAGER == 1
 +  if(!AesSeed.empty()) {
-+    if(!llvm::cryptoutils->prng_seed(AesSeed.c_str())) {
-+      exit(1);
-+    }
++    llvm::cryptoutils->prng_seed(AesSeed.c_str());
 +  }
 +
 +  //random generator
 +  if(!Seed.empty()) {
-+    if(!llvm::cryptoutils->prng_seed(Seed.c_str()))
-+      exit(1);
++    llvm::cryptoutils->prng_seed(Seed.c_str());
 +  }
 +#endif
  }
  
  namespace llvm {
-@@ -1171,6 +1199,13 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
+@@ -1171,6 +1196,13 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
    MPM.addPass(RequireAnalysisPass<GlobalsAA, Module>());
  
    FunctionPassManager OptimizePM;
@@ -448,7 +445,7 @@ index e838665eb9ce..919fdd59db82 100644
    OptimizePM.addPass(Float2IntPass());
    OptimizePM.addPass(LowerConstantIntrinsicsPass());
  
-@@ -1234,6 +1269,9 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
+@@ -1234,6 +1266,9 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
  
    OptimizePM.addPass(CoroCleanupPass());
  
@@ -599,10 +596,10 @@ index 6e5aeb9c41f6..43b1bfeab94c 100644
    MPM.add(createCFGSimplificationPass(
 diff --git a/llvm/lib/Transforms/Obfuscation/BogusControlFlow.cpp b/llvm/lib/Transforms/Obfuscation/BogusControlFlow.cpp
 new file mode 100644
-index 000000000000..cd4339fefe14
+index 000000000000..82f733947233
 --- /dev/null
 +++ b/llvm/lib/Transforms/Obfuscation/BogusControlFlow.cpp
-@@ -0,0 +1,700 @@
+@@ -0,0 +1,701 @@
 +//===- BogusControlFlow.cpp - BogusControlFlow Obfuscation pass ----------===//
 +//
 +//                     The LLVM Compiler Infrastructure
@@ -818,7 +815,8 @@ index 000000000000..cd4339fefe14
 +      // Put all the function's block in a list
 +      std::list<BasicBlock *> basicBlocks;
 +      for (Function::iterator i = F.begin(); i != F.end(); ++i) {
-+        basicBlocks.push_back(&*i);
++        if (!i->isEHPad())
++          basicBlocks.push_back(&*i);
 +      }
 +      DEBUG_WITH_TYPE(
 +          "gen", errs() << "bcf: Iterating on the Function's Basic Blocks\n");
@@ -2583,10 +2581,10 @@ index 000000000000..baa49168d6f6
 +}
 diff --git a/llvm/lib/Transforms/Obfuscation/Flattening.cpp b/llvm/lib/Transforms/Obfuscation/Flattening.cpp
 new file mode 100644
-index 000000000000..c33c455cbf48
+index 000000000000..1d5f6516dd64
 --- /dev/null
 +++ b/llvm/lib/Transforms/Obfuscation/Flattening.cpp
-@@ -0,0 +1,256 @@
+@@ -0,0 +1,266 @@
 +//===- Flattening.cpp - Flattening Obfuscation pass------------------------===//
 +//
 +//                     The LLVM Compiler Infrastructure
@@ -2700,6 +2698,7 @@ index 000000000000..c33c455cbf48
 +    br = cast<BranchInst>(insert->getTerminator());
 +  }
 +
++  BasicBlock *zeroBB = NULL;
 +  if ((br != NULL && br->isConditional()) ||
 +      insert->getTerminator()->getNumSuccessors() > 1) {
 +    BasicBlock::iterator i = insert->end();
@@ -2711,6 +2710,10 @@ index 000000000000..c33c455cbf48
 +
 +    BasicBlock *tmpBB = insert->splitBasicBlock(i, "first");
 +    origBB.insert(origBB.begin(), tmpBB);
++  }
++  else if (br != NULL && insert->getTerminator()->getNumSuccessors() == 1) {
++    // Record the first BB branch to
++    zeroBB = insert->getTerminator()->getSuccessor(0);
 +  }
 +
 +  // Remove jump
@@ -2763,7 +2766,12 @@ index 000000000000..c33c455cbf48
 +    numCase = cast<ConstantInt>(ConstantInt::get(
 +        switchI->getCondition()->getType(),
 +        llvm::cryptoutils->scramble32(switchI->getNumCases(), scrambling_key)));
-+    switchI->addCase(numCase, i);
++    if (zeroBB && zeroBB != i) {
++      switchI->addCase(numCase, zeroBB);
++      zeroBB = NULL;
++    } else {
++      switchI->addCase(numCase, i);
++    }
 +  }
 +
 +  // Recalculate switchVar
