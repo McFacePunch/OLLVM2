@@ -1,15 +1,3 @@
-diff --git a/llvm/include/llvm/InitializePasses.h b/llvm/include/llvm/InitializePasses.h
-index 489ef045796f..3ceb4c4cbc29 100644
---- a/llvm/include/llvm/InitializePasses.h
-+++ b/llvm/include/llvm/InitializePasses.h
-@@ -166,6 +166,7 @@ void initializeFinalizeMachineBundlesPass(PassRegistry&);
- void initializeFixIrreduciblePass(PassRegistry &);
- void initializeFixupStatepointCallerSavedPass(PassRegistry&);
- void initializeFlattenCFGLegacyPassPass(PassRegistry &);
-+void initializeFlatteningPass(PassRegistry&);
- void initializeFloat2IntLegacyPassPass(PassRegistry&);
- void initializeForceFunctionAttrsLegacyPassPass(PassRegistry&);
- void initializeForwardControlFlowIntegrityPass(PassRegistry&);
 diff --git a/llvm/include/llvm/Transforms/Obfuscation/BogusControlFlow.h b/llvm/include/llvm/Transforms/Obfuscation/BogusControlFlow.h
 new file mode 100644
 index 000000000000..1caa4f6b4d2f
@@ -394,7 +382,7 @@ index dedfc81f11bb..c461f79fa3c1 100644
  
  static const Regex DefaultAliasRegex(
 diff --git a/llvm/lib/Passes/PassBuilderPipelines.cpp b/llvm/lib/Passes/PassBuilderPipelines.cpp
-index e838665eb9ce..a2bac331c0f5 100644
+index e838665eb9ce..919fdd59db82 100644
 --- a/llvm/lib/Passes/PassBuilderPipelines.cpp
 +++ b/llvm/lib/Passes/PassBuilderPipelines.cpp
 @@ -127,6 +127,11 @@
@@ -430,7 +418,7 @@ index e838665eb9ce..a2bac331c0f5 100644
    MergeFunctions = EnableMergeFunctions;
    EagerlyInvalidateAnalyses = EnableEagerlyInvalidateAnalyses;
 +
-+#if !defined(LLVM_ENABLE_NEW_PASS_MANAGER) || LLVM_ENABLE_NEW_PASS_MANAGER == 0
++#if defined(LLVM_ENABLE_NEW_PASS_MANAGER) && LLVM_ENABLE_NEW_PASS_MANAGER == 1
 +  if(!AesSeed.empty()) {
 +    if(!llvm::cryptoutils->prng_seed(AesSeed.c_str())) {
 +      exit(1);
