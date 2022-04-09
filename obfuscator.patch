@@ -293,15 +293,22 @@ index 000000000000..6e96bf609810
 +#endif
 diff --git a/llvm/include/llvm/Transforms/Obfuscation/StringObfuscation.h b/llvm/include/llvm/Transforms/Obfuscation/StringObfuscation.h
 new file mode 100755
-index 000000000000..b902332b9e39
+index 000000000000..9c54defc4c7b
 --- /dev/null
 +++ b/llvm/include/llvm/Transforms/Obfuscation/StringObfuscation.h
-@@ -0,0 +1,6 @@
+@@ -0,0 +1,13 @@
 +// LLVM include
 +#include "llvm/Pass.h"
++#include "llvm/IR/PassManager.h" // New PassManager
 +
 +namespace llvm {
 +      Pass* createStringObfuscation(bool flag);
++class StringObfuscationNewPass : public PassInfoMixin<StringObfuscationNewPass>{ // New PassManager
++public:
++  PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
++
++  static bool isRequired() { return true; }
++};
 +}
 diff --git a/llvm/include/llvm/Transforms/Obfuscation/Substitution.h b/llvm/include/llvm/Transforms/Obfuscation/Substitution.h
 new file mode 100644
@@ -366,10 +373,10 @@ index 000000000000..e277b4049298
 +
 +#endif
 diff --git a/llvm/lib/Passes/PassBuilder.cpp b/llvm/lib/Passes/PassBuilder.cpp
-index dedfc81f11bb..c461f79fa3c1 100644
+index dedfc81f11bb..1358d2bac8a0 100644
 --- a/llvm/lib/Passes/PassBuilder.cpp
 +++ b/llvm/lib/Passes/PassBuilder.cpp
-@@ -245,6 +245,11 @@
+@@ -245,6 +245,12 @@
  #include "llvm/Transforms/Vectorize/SLPVectorizer.h"
  #include "llvm/Transforms/Vectorize/VectorCombine.h"
  
@@ -377,15 +384,16 @@ index dedfc81f11bb..c461f79fa3c1 100644
 +#include "llvm/Transforms/Obfuscation/Substitution.h"
 +#include "llvm/Transforms/Obfuscation/BogusControlFlow.h"
 +#include "llvm/Transforms/Obfuscation/Split.h"
++#include "llvm/Transforms/Obfuscation/StringObfuscation.h"
 +
  using namespace llvm;
  
  static const Regex DefaultAliasRegex(
 diff --git a/llvm/lib/Passes/PassBuilderPipelines.cpp b/llvm/lib/Passes/PassBuilderPipelines.cpp
-index e838665eb9ce..9c5fd73df97d 100644
+index e838665eb9ce..86eee0eb44bc 100644
 --- a/llvm/lib/Passes/PassBuilderPipelines.cpp
 +++ b/llvm/lib/Passes/PassBuilderPipelines.cpp
-@@ -127,6 +127,11 @@
+@@ -127,6 +127,12 @@
  #include "llvm/Transforms/Vectorize/SLPVectorizer.h"
  #include "llvm/Transforms/Vectorize/VectorCombine.h"
  
@@ -393,11 +401,12 @@ index e838665eb9ce..9c5fd73df97d 100644
 +#include "llvm/Transforms/Obfuscation/Substitution.h"
 +#include "llvm/Transforms/Obfuscation/BogusControlFlow.h"
 +#include "llvm/Transforms/Obfuscation/Split.h"
++#include "llvm/Transforms/Obfuscation/StringObfuscation.h"
 +
  using namespace llvm;
  
  static cl::opt<InliningAdvisorMode> UseInlineAdvisor(
-@@ -182,6 +187,15 @@ static cl::opt<bool> EnableMergeFunctions(
+@@ -182,6 +188,15 @@ static cl::opt<bool> EnableMergeFunctions(
      "enable-merge-functions", cl::init(false), cl::Hidden,
      cl::desc("Enable function merging as part of the optimization pipeline"));
  
@@ -413,7 +422,7 @@ index e838665eb9ce..9c5fd73df97d 100644
  PipelineTuningOptions::PipelineTuningOptions() {
    LoopInterleaving = true;
    LoopVectorization = true;
-@@ -193,6 +207,17 @@ PipelineTuningOptions::PipelineTuningOptions() {
+@@ -193,6 +208,17 @@ PipelineTuningOptions::PipelineTuningOptions() {
    CallGraphProfile = true;
    MergeFunctions = EnableMergeFunctions;
    EagerlyInvalidateAnalyses = EnableEagerlyInvalidateAnalyses;
@@ -431,7 +440,7 @@ index e838665eb9ce..9c5fd73df97d 100644
  }
  
  namespace llvm {
-@@ -1171,6 +1196,13 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
+@@ -1171,6 +1197,13 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
    MPM.addPass(RequireAnalysisPass<GlobalsAA, Module>());
  
    FunctionPassManager OptimizePM;
@@ -445,7 +454,7 @@ index e838665eb9ce..9c5fd73df97d 100644
    OptimizePM.addPass(Float2IntPass());
    OptimizePM.addPass(LowerConstantIntrinsicsPass());
  
-@@ -1234,6 +1266,9 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
+@@ -1234,10 +1267,15 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
  
    OptimizePM.addPass(CoroCleanupPass());
  
@@ -455,11 +464,25 @@ index e838665eb9ce..9c5fd73df97d 100644
    // Add the core optimizing pipeline.
    MPM.addPass(createModuleToFunctionPassAdaptor(std::move(OptimizePM),
                                                  PTO.EagerlyInvalidateAnalyses));
+ 
++  MPM.addPass(StringObfuscationNewPass());
++
+   for (auto &C : OptimizerLastEPCallbacks)
+     C(MPM, Level);
+ 
 diff --git a/llvm/lib/Passes/PassRegistry.def b/llvm/lib/Passes/PassRegistry.def
-index 69d8d8c43267..2285898c56dd 100644
+index 69d8d8c43267..00ccfcef05fd 100644
 --- a/llvm/lib/Passes/PassRegistry.def
 +++ b/llvm/lib/Passes/PassRegistry.def
-@@ -265,6 +265,10 @@ FUNCTION_PASS("make-guards-explicit", MakeGuardsExplicitPass())
+@@ -119,6 +119,7 @@ MODULE_PASS("sancov-module", ModuleSanitizerCoveragePass())
+ MODULE_PASS("memprof-module", ModuleMemProfilerPass())
+ MODULE_PASS("poison-checking", PoisonCheckingPass())
+ MODULE_PASS("pseudo-probe-update", PseudoProbeUpdatePass())
++MODULE_PASS("obf-str", StringObfuscationNewPass())
+ #undef MODULE_PASS
+ 
+ #ifndef MODULE_PASS_WITH_PARAMS
+@@ -265,6 +266,10 @@ FUNCTION_PASS("make-guards-explicit", MakeGuardsExplicitPass())
  FUNCTION_PASS("gvn-hoist", GVNHoistPass())
  FUNCTION_PASS("gvn-sink", GVNSinkPass())
  FUNCTION_PASS("helloworld", HelloWorldPass())
@@ -490,7 +513,7 @@ index f9833224d142..a0cddafb784e 100644
 +  Obfuscation
    )
 diff --git a/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp b/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp
-index 6e5aeb9c41f6..43b1bfeab94c 100644
+index 6e5aeb9c41f6..c039068b3080 100644
 --- a/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp
 +++ b/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp
 @@ -52,6 +52,13 @@
@@ -507,7 +530,7 @@ index 6e5aeb9c41f6..43b1bfeab94c 100644
  using namespace llvm;
  
  namespace llvm {
-@@ -148,6 +155,17 @@ cl::opt<bool>
+@@ -148,6 +155,15 @@ cl::opt<bool>
      EnableGVNSink("enable-gvn-sink", cl::init(false), cl::ZeroOrMore,
                    cl::desc("Enable the GVN sinking pass (default = off)"));
  
@@ -519,13 +542,11 @@ index 6e5aeb9c41f6..43b1bfeab94c 100644
 +static cl::opt<std::string> Seed("seed", cl::init(""),
 +                           cl::desc("seed for the random"));
 +#endif
-+static cl::opt<bool> StringObf("sobf", cl::init(false),
-+                           cl::desc("Enable the string obfuscation"));
 +
  // This option is used in simplifying testing SampleFDO optimizations for
  // profile loading.
  cl::opt<bool>
-@@ -220,6 +238,22 @@ PassManagerBuilder::PassManagerBuilder() {
+@@ -220,6 +236,22 @@ PassManagerBuilder::PassManagerBuilder() {
      PerformThinLTO = EnablePerformThinLTO;
      DivergentTarget = false;
      CallGraphProfile = true;
@@ -548,7 +569,7 @@ index 6e5aeb9c41f6..43b1bfeab94c 100644
  }
  
  PassManagerBuilder::~PassManagerBuilder() {
-@@ -673,7 +707,7 @@ void PassManagerBuilder::addVectorPasses(legacy::PassManagerBase &PM,
+@@ -673,7 +705,7 @@ void PassManagerBuilder::addVectorPasses(legacy::PassManagerBase &PM,
      PM.add(createInstructionCombiningPass());
  }
  
@@ -557,7 +578,7 @@ index 6e5aeb9c41f6..43b1bfeab94c 100644
      legacy::PassManagerBase &MPM) {
    // Whether this is a default or *LTO pre-link pipeline. The FullLTO post-link
    // is handled separately, so just check this is not the ThinLTO post-link.
-@@ -693,6 +727,18 @@ void PassManagerBuilder::populateModulePassManager(
+@@ -693,6 +725,14 @@ void PassManagerBuilder::populateModulePassManager(
    // Allow forcing function attributes as a debugging and tuning aid.
    MPM.add(createForceFunctionAttrsLegacyPass());
  
@@ -567,16 +588,12 @@ index 6e5aeb9c41f6..43b1bfeab94c 100644
 +    MPM.add(createLowerSwitchPass());
 +  #endif
 +  MPM.add(createFlattening());
-+#if !defined(LLVM_ENABLE_NEW_PASS_MANAGER) || LLVM_ENABLE_NEW_PASS_MANAGER == 0
-+  MPM.add(createStringObfuscation(StringObf));
-+#else
 +  MPM.add(createStringObfuscation(false));
-+#endif
 +
    // If all optimizations are disabled, just run the always-inline pass and,
    // if enabled, the function merging pass.
    if (OptLevel == 0) {
-@@ -721,6 +767,8 @@ void PassManagerBuilder::populateModulePassManager(
+@@ -721,6 +761,8 @@ void PassManagerBuilder::populateModulePassManager(
        MPM.add(createGlobalDCEPass());
      }
  
@@ -585,7 +602,7 @@ index 6e5aeb9c41f6..43b1bfeab94c 100644
      addExtensionsToPM(EP_EnabledOnOptLevel0, MPM);
  
      if (PrepareForLTO || PrepareForThinLTO) {
-@@ -991,6 +1039,8 @@ void PassManagerBuilder::populateModulePassManager(
+@@ -991,6 +1033,8 @@ void PassManagerBuilder::populateModulePassManager(
    // flattening of blocks.
    MPM.add(createDivRemPairsPass());
  
@@ -3092,10 +3109,10 @@ index 000000000000..9a692dcb73fb
 +}
 diff --git a/llvm/lib/Transforms/Obfuscation/StringObfuscation.cpp b/llvm/lib/Transforms/Obfuscation/StringObfuscation.cpp
 new file mode 100755
-index 000000000000..eeb90fa46cbe
+index 000000000000..7a20c9387ebc
 --- /dev/null
 +++ b/llvm/lib/Transforms/Obfuscation/StringObfuscation.cpp
-@@ -0,0 +1,216 @@
+@@ -0,0 +1,229 @@
 +#include <string>
 +#include <sstream>
 +
@@ -3114,6 +3131,9 @@ index 000000000000..eeb90fa46cbe
 +#include "llvm/IR/Instructions.h"
 +
 +using namespace llvm;
++
++static cl::opt<bool> StringObf("sobf", cl::init(false),
++                           cl::desc("Enable the string obfuscation"));
 +
 +#define DEBUG_TYPE "objdiv"
 +
@@ -3275,8 +3295,8 @@ index 000000000000..eeb90fa46cbe
 +                                Value* indexList[2] = {ConstantInt::get(variable->getType(), 0), variable};
 +                                Value *const_key=builder.getInt8(key);
 +                                
-+                                Value *GEP=builder.CreateGEP(gvar->getValueType(),gvar,ArrayRef<Value*>(indexList, 2),"arrayIdx");
-+                                LoadInst *loadElement=builder.CreateLoad(GEP->getType(),GEP,false);
++                                Value *GEP=builder.CreateGEP(gvar->getType()->getScalarType()->getPointerElementType(),gvar,ArrayRef<Value*>(indexList, 2),"arrayIdx");
++                                LoadInst *loadElement=builder.CreateLoad(GEP->getType()->getScalarType()->getPointerElementType(),GEP,false);
 +                                loadElement->setAlignment(Align(1));
 +                                //errs()<<"Type: "<<*loadElement<<"\n";
 +                                //CastInst* extended = new ZExtInst(const_key, loadElement->getType(), "extended", for_body);
@@ -3305,6 +3325,16 @@ index 000000000000..eeb90fa46cbe
 +        };
 +
 +}
++
++llvm::PreservedAnalyses llvm::StringObfuscationNewPass::run(llvm::Module &M, llvm::ModuleAnalysisManager &AM)
++{
++        llvm::StringObfuscationPass sobf(StringObf);
++        if (sobf.runOnModule(M))
++                return PreservedAnalyses::all();
++
++        return PreservedAnalyses::none();
++}
++
 +
 +char StringObfuscationPass::ID = 0;
 +static RegisterPass<StringObfuscationPass> X("GVDiv", "Global variable (i.e., const char*) diversification pass", false, true);
