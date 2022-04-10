@@ -2598,10 +2598,10 @@ index 000000000000..baa49168d6f6
 +}
 diff --git a/llvm/lib/Transforms/Obfuscation/Flattening.cpp b/llvm/lib/Transforms/Obfuscation/Flattening.cpp
 new file mode 100644
-index 000000000000..1d5f6516dd64
+index 000000000000..9437a848407b
 --- /dev/null
 +++ b/llvm/lib/Transforms/Obfuscation/Flattening.cpp
-@@ -0,0 +1,266 @@
+@@ -0,0 +1,256 @@
 +//===- Flattening.cpp - Flattening Obfuscation pass------------------------===//
 +//
 +//                     The LLVM Compiler Infrastructure
@@ -2715,7 +2715,6 @@ index 000000000000..1d5f6516dd64
 +    br = cast<BranchInst>(insert->getTerminator());
 +  }
 +
-+  BasicBlock *zeroBB = NULL;
 +  if ((br != NULL && br->isConditional()) ||
 +      insert->getTerminator()->getNumSuccessors() > 1) {
 +    BasicBlock::iterator i = insert->end();
@@ -2727,10 +2726,6 @@ index 000000000000..1d5f6516dd64
 +
 +    BasicBlock *tmpBB = insert->splitBasicBlock(i, "first");
 +    origBB.insert(origBB.begin(), tmpBB);
-+  }
-+  else if (br != NULL && insert->getTerminator()->getNumSuccessors() == 1) {
-+    // Record the first BB branch to
-+    zeroBB = insert->getTerminator()->getSuccessor(0);
 +  }
 +
 +  // Remove jump
@@ -2783,12 +2778,7 @@ index 000000000000..1d5f6516dd64
 +    numCase = cast<ConstantInt>(ConstantInt::get(
 +        switchI->getCondition()->getType(),
 +        llvm::cryptoutils->scramble32(switchI->getNumCases(), scrambling_key)));
-+    if (zeroBB && zeroBB != i) {
-+      switchI->addCase(numCase, zeroBB);
-+      zeroBB = NULL;
-+    } else {
 +      switchI->addCase(numCase, i);
-+    }
 +  }
 +
 +  // Recalculate switchVar
