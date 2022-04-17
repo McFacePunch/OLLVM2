@@ -1,7 +1,7 @@
 ## Configure LLVM to add obfuscation support
 
 ```bash
-git clone -b release/14.x https://github.com/sr-tream/obfuscator
+git clone -b main https://github.com/sr-tream/obfuscator
 cd obfuscator
 git submodule update --init llvm-project
 cd llvm-project

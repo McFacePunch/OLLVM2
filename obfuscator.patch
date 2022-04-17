@@ -1,9 +1,9 @@
 diff --git a/llvm/include/llvm/Transforms/Obfuscation/BogusControlFlow.h b/llvm/include/llvm/Transforms/Obfuscation/BogusControlFlow.h
 new file mode 100644
-index 000000000000..1caa4f6b4d2f
+index 000000000000..4eb42ac1a5bb
 --- /dev/null
 +++ b/llvm/include/llvm/Transforms/Obfuscation/BogusControlFlow.h
-@@ -0,0 +1,47 @@
+@@ -0,0 +1,46 @@
 +//===- BogusControlFlow.h - bogus control flow obfuscation pass -----------===//
 +//
 +//                     The LLVM Compiler Infrastructure
@@ -29,8 +29,8 @@ index 000000000000..1caa4f6b4d2f
 +#include "llvm/IR/Instructions.h"
 +#include "llvm/IR/LLVMContext.h"
 +#include "llvm/IR/Module.h"
++#include "llvm/IR/PassManager.h" // New PassManager
 +#include "llvm/IR/Type.h"
-+#include "llvm/Pass.h"
 +#include "llvm/Support/CommandLine.h"
 +#include "llvm/Support/Debug.h"
 +#include "llvm/Support/raw_ostream.h"
@@ -38,11 +38,10 @@ index 000000000000..1caa4f6b4d2f
 +#include "llvm/Transforms/Obfuscation/CryptoUtils.h"
 +#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 +#include "llvm/Transforms/Utils/Cloning.h"
-+#include "llvm/IR/PassManager.h" // New PassManager
 +
 +namespace llvm {
-+Pass *createBogus();
-+class BogusControlFlowPass : public PassInfoMixin<BogusControlFlowPass>{ // New PassManager
++class BogusControlFlowPass
++    : public PassInfoMixin<BogusControlFlowPass> { // New PassManager
 +public:
 +  PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
 +
@@ -53,7 +52,7 @@ index 000000000000..1caa4f6b4d2f
 +#endif
 diff --git a/llvm/include/llvm/Transforms/Obfuscation/CryptoUtils.h b/llvm/include/llvm/Transforms/Obfuscation/CryptoUtils.h
 new file mode 100644
-index 000000000000..1994ec002b90
+index 000000000000..b69c947e580d
 --- /dev/null
 +++ b/llvm/include/llvm/Transforms/Obfuscation/CryptoUtils.h
 @@ -0,0 +1,145 @@
@@ -125,12 +124,12 @@ index 000000000000..1994ec002b90
 +#endif
 +#define ENDIAN_64BITWORD
 +
-+#elif defined(__sparc)
++#elif defined(__sparc) || defined(__aarch64__)
 +
 +#ifndef ENDIAN_BIG
 +#define ENDIAN_BIG
 +#endif
-+#if defined(__arch64__)
++#if defined(__arch64__) || defined(__aarch64__)
 +#define ENDIAN_64BITWORD
 +#else
 +#define ENDIAN_32BITWORD
@@ -204,10 +203,10 @@ index 000000000000..1994ec002b90
 +#endif
 diff --git a/llvm/include/llvm/Transforms/Obfuscation/Flattening.h b/llvm/include/llvm/Transforms/Obfuscation/Flattening.h
 new file mode 100644
-index 000000000000..fff5e4e2ce1f
+index 000000000000..bde0e3ad3d8a
 --- /dev/null
 +++ b/llvm/include/llvm/Transforms/Obfuscation/Flattening.h
-@@ -0,0 +1,39 @@
+@@ -0,0 +1,38 @@
 +//===- FlatteningIncludes.h - Flattening Obfuscation pass------------------===//
 +//
 +//                     The LLVM Compiler Infrastructure
@@ -227,7 +226,6 @@ index 000000000000..fff5e4e2ce1f
 +#include "llvm/ADT/Statistic.h"
 +#include "llvm/IR/Function.h"
 +#include "llvm/IR/Module.h"
-+#include "llvm/Pass.h"
 +#include "llvm/Support/CommandLine.h"
 +#include "llvm/Transforms/IPO.h"
 +#include "llvm/Transforms/Obfuscation/CryptoUtils.h"
@@ -237,7 +235,7 @@ index 000000000000..fff5e4e2ce1f
 +#include "llvm/IR/PassManager.h" // New PassManager
 +
 +namespace llvm {
-+Pass *createFlattening();
++  bool obf_flatten(Function *f);
 +class FlatteningPass : public PassInfoMixin<FlatteningPass>{ // New PassManager
 +public:
 +  PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
@@ -249,10 +247,10 @@ index 000000000000..fff5e4e2ce1f
 +#endif
 diff --git a/llvm/include/llvm/Transforms/Obfuscation/Split.h b/llvm/include/llvm/Transforms/Obfuscation/Split.h
 new file mode 100644
-index 000000000000..6e96bf609810
+index 000000000000..0ae854d94a56
 --- /dev/null
 +++ b/llvm/include/llvm/Transforms/Obfuscation/Split.h
-@@ -0,0 +1,38 @@
+@@ -0,0 +1,37 @@
 +//===- FlatteningIncludes.h - Flattening Obfuscation pass------------------===//
 +//
 +//                     The LLVM Compiler Infrastructure
@@ -271,38 +269,35 @@ index 000000000000..6e96bf609810
 +#include "llvm/ADT/Statistic.h"
 +#include "llvm/IR/BasicBlock.h"
 +#include "llvm/IR/Module.h"
-+#include "llvm/Pass.h"
++#include "llvm/IR/PassManager.h" // New PassManager
 +#include "llvm/Support/CommandLine.h"
 +#include "llvm/Transforms/IPO.h"
 +#include "llvm/Transforms/Obfuscation/CryptoUtils.h"
 +#include "llvm/Transforms/Obfuscation/Utils.h"
 +#include "llvm/Transforms/Scalar.h"
 +#include "llvm/Transforms/Utils/Local.h" // For DemoteRegToStack and DemotePHIToStack
-+#include "llvm/IR/PassManager.h" // New PassManager
 +
 +namespace llvm {
-+Pass *createSplitBasicBlock();
-+class SplitBasicBlockPass : public PassInfoMixin<SplitBasicBlockPass>{ // New PassManager
++class SplitBasicBlockPass
++    : public PassInfoMixin<SplitBasicBlockPass> { // New PassManager
 +public:
 +  PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
 +
 +  static bool isRequired() { return true; }
 +};
-+}
++} // namespace llvm
 +
 +#endif
 diff --git a/llvm/include/llvm/Transforms/Obfuscation/StringObfuscation.h b/llvm/include/llvm/Transforms/Obfuscation/StringObfuscation.h
 new file mode 100755
-index 000000000000..9c54defc4c7b
+index 000000000000..62016949dfdc
 --- /dev/null
 +++ b/llvm/include/llvm/Transforms/Obfuscation/StringObfuscation.h
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,11 @@
 +// LLVM include
-+#include "llvm/Pass.h"
 +#include "llvm/IR/PassManager.h" // New PassManager
 +
 +namespace llvm {
-+      Pass* createStringObfuscation(bool flag);
 +class StringObfuscationNewPass : public PassInfoMixin<StringObfuscationNewPass>{ // New PassManager
 +public:
 +  PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM);
@@ -312,10 +307,10 @@ index 000000000000..9c54defc4c7b
 +}
 diff --git a/llvm/include/llvm/Transforms/Obfuscation/Substitution.h b/llvm/include/llvm/Transforms/Obfuscation/Substitution.h
 new file mode 100644
-index 000000000000..31d42557cd26
+index 000000000000..1a256025aa3e
 --- /dev/null
 +++ b/llvm/include/llvm/Transforms/Obfuscation/Substitution.h
-@@ -0,0 +1,37 @@
+@@ -0,0 +1,36 @@
 +//===- SubstitutionIncludes.h - Substitution Obfuscation ------------------===//
 +//
 +//                     The LLVM Compiler Infrastructure
@@ -336,15 +331,14 @@ index 000000000000..31d42557cd26
 +#include "llvm/IR/Function.h"
 +#include "llvm/IR/Instructions.h"
 +#include "llvm/IR/Module.h"
-+#include "llvm/Pass.h"
++#include "llvm/IR/PassManager.h" // New PassManager
 +#include "llvm/Support/CommandLine.h"
 +#include "llvm/Transforms/IPO.h"
 +#include "llvm/Transforms/Obfuscation/CryptoUtils.h"
-+#include "llvm/IR/PassManager.h" // New PassManager
 +
 +namespace llvm {
-+Pass *createSubstitution();
-+class SubstitutionPass : public PassInfoMixin<SubstitutionPass>{ // New PassManager
++class SubstitutionPass
++    : public PassInfoMixin<SubstitutionPass> { // New PassManager
 +public:
 +  PreservedAnalyses run(Function &F, FunctionAnalysisManager &AM);
 +
@@ -355,7 +349,7 @@ index 000000000000..31d42557cd26
 +#endif
 diff --git a/llvm/include/llvm/Transforms/Obfuscation/Utils.h b/llvm/include/llvm/Transforms/Obfuscation/Utils.h
 new file mode 100644
-index 000000000000..e277b4049298
+index 000000000000..36c69515ae66
 --- /dev/null
 +++ b/llvm/include/llvm/Transforms/Obfuscation/Utils.h
 @@ -0,0 +1,13 @@
@@ -368,15 +362,15 @@ index 000000000000..e277b4049298
 +#include <string>
 +
 +void fixStack(llvm::Function *f);
-+llvm::StringRef readAnnotate(llvm::Function* f, llvm::StringRef attr);
++llvm::StringRef readAnnotate(llvm::Function *f, llvm::StringRef attr);
 +bool toObfuscate(bool flag, llvm::Function *f, llvm::StringRef attribute);
 +
 +#endif
 diff --git a/llvm/lib/Passes/PassBuilder.cpp b/llvm/lib/Passes/PassBuilder.cpp
-index dedfc81f11bb..1358d2bac8a0 100644
+index 8de919d24291..ef77c7e3b15c 100644
 --- a/llvm/lib/Passes/PassBuilder.cpp
 +++ b/llvm/lib/Passes/PassBuilder.cpp
-@@ -245,6 +245,12 @@
+@@ -248,6 +248,12 @@
  #include "llvm/Transforms/Vectorize/SLPVectorizer.h"
  #include "llvm/Transforms/Vectorize/VectorCombine.h"
  
@@ -390,10 +384,10 @@ index dedfc81f11bb..1358d2bac8a0 100644
  
  static const Regex DefaultAliasRegex(
 diff --git a/llvm/lib/Passes/PassBuilderPipelines.cpp b/llvm/lib/Passes/PassBuilderPipelines.cpp
-index e838665eb9ce..86eee0eb44bc 100644
+index bc4bdb3adb31..c0657a64a9ce 100644
 --- a/llvm/lib/Passes/PassBuilderPipelines.cpp
 +++ b/llvm/lib/Passes/PassBuilderPipelines.cpp
-@@ -127,6 +127,12 @@
+@@ -128,6 +128,12 @@
  #include "llvm/Transforms/Vectorize/SLPVectorizer.h"
  #include "llvm/Transforms/Vectorize/VectorCombine.h"
  
@@ -406,28 +400,25 @@ index e838665eb9ce..86eee0eb44bc 100644
  using namespace llvm;
  
  static cl::opt<InliningAdvisorMode> UseInlineAdvisor(
-@@ -182,6 +188,15 @@ static cl::opt<bool> EnableMergeFunctions(
+@@ -183,6 +189,13 @@ static cl::opt<bool> EnableMergeFunctions(
      "enable-merge-functions", cl::init(false), cl::Hidden,
      cl::desc("Enable function merging as part of the optimization pipeline"));
  
 +// Flags for obfuscation
-+#if defined(LLVM_ENABLE_NEW_PASS_MANAGER) && LLVM_ENABLE_NEW_PASS_MANAGER == 1
 +static cl::opt<std::string> AesSeed("aesSeed", cl::init(""),
 +                                    cl::desc("seed for the AES-CTR PRNG"));
 +
 +static cl::opt<std::string> Seed("seed", cl::init(""),
 +                           cl::desc("seed for the random"));
-+#endif
 +
  PipelineTuningOptions::PipelineTuningOptions() {
    LoopInterleaving = true;
    LoopVectorization = true;
-@@ -193,6 +208,17 @@ PipelineTuningOptions::PipelineTuningOptions() {
+@@ -194,6 +207,15 @@ PipelineTuningOptions::PipelineTuningOptions() {
    CallGraphProfile = true;
    MergeFunctions = EnableMergeFunctions;
    EagerlyInvalidateAnalyses = EnableEagerlyInvalidateAnalyses;
 +
-+#if defined(LLVM_ENABLE_NEW_PASS_MANAGER) && LLVM_ENABLE_NEW_PASS_MANAGER == 1
 +  if(!AesSeed.empty()) {
 +    llvm::cryptoutils->prng_seed(AesSeed.c_str());
 +  }
@@ -436,12 +427,11 @@ index e838665eb9ce..86eee0eb44bc 100644
 +  if(!Seed.empty()) {
 +    llvm::cryptoutils->prng_seed(Seed.c_str());
 +  }
-+#endif
  }
  
  namespace llvm {
-@@ -1171,6 +1197,13 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
-   MPM.addPass(RequireAnalysisPass<GlobalsAA, Module>());
+@@ -1173,6 +1195,13 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
+     C(MPM, Level);
  
    FunctionPassManager OptimizePM;
 +
@@ -454,7 +444,7 @@ index e838665eb9ce..86eee0eb44bc 100644
    OptimizePM.addPass(Float2IntPass());
    OptimizePM.addPass(LowerConstantIntrinsicsPass());
  
-@@ -1234,10 +1267,15 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
+@@ -1236,10 +1265,15 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
  
    OptimizePM.addPass(CoroCleanupPass());
  
@@ -471,10 +461,10 @@ index e838665eb9ce..86eee0eb44bc 100644
      C(MPM, Level);
  
 diff --git a/llvm/lib/Passes/PassRegistry.def b/llvm/lib/Passes/PassRegistry.def
-index 69d8d8c43267..00ccfcef05fd 100644
+index 8009a308bdf5..05751a68f24e 100644
 --- a/llvm/lib/Passes/PassRegistry.def
 +++ b/llvm/lib/Passes/PassRegistry.def
-@@ -119,6 +119,7 @@ MODULE_PASS("sancov-module", ModuleSanitizerCoveragePass())
+@@ -121,6 +121,7 @@ MODULE_PASS("sancov-module", ModuleSanitizerCoveragePass())
  MODULE_PASS("memprof-module", ModuleMemProfilerPass())
  MODULE_PASS("poison-checking", PoisonCheckingPass())
  MODULE_PASS("pseudo-probe-update", PseudoProbeUpdatePass())
@@ -482,7 +472,7 @@ index 69d8d8c43267..00ccfcef05fd 100644
  #undef MODULE_PASS
  
  #ifndef MODULE_PASS_WITH_PARAMS
-@@ -265,6 +266,10 @@ FUNCTION_PASS("make-guards-explicit", MakeGuardsExplicitPass())
+@@ -267,6 +268,10 @@ FUNCTION_PASS("make-guards-explicit", MakeGuardsExplicitPass())
  FUNCTION_PASS("gvn-hoist", GVNHoistPass())
  FUNCTION_PASS("gvn-sink", GVNSinkPass())
  FUNCTION_PASS("helloworld", HelloWorldPass())
@@ -512,111 +502,12 @@ index f9833224d142..a0cddafb784e 100644
    Scalar
 +  Obfuscation
    )
-diff --git a/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp b/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp
-index 6e5aeb9c41f6..c039068b3080 100644
---- a/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp
-+++ b/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp
-@@ -52,6 +52,13 @@
- #include "llvm/Transforms/Vectorize/SLPVectorizer.h"
- #include "llvm/Transforms/Vectorize/VectorCombine.h"
- 
-+#include "llvm/Transforms/Obfuscation/BogusControlFlow.h"
-+#include "llvm/Transforms/Obfuscation/Flattening.h"
-+#include "llvm/Transforms/Obfuscation/Split.h"
-+#include "llvm/Transforms/Obfuscation/Substitution.h"
-+#include "llvm/Transforms/Obfuscation/StringObfuscation.h"
-+#include "llvm/Transforms/Obfuscation/CryptoUtils.h"
-+
- using namespace llvm;
- 
- namespace llvm {
-@@ -148,6 +155,15 @@ cl::opt<bool>
-     EnableGVNSink("enable-gvn-sink", cl::init(false), cl::ZeroOrMore,
-                   cl::desc("Enable the GVN sinking pass (default = off)"));
- 
-+// Flags for obfuscation
-+#if !defined(LLVM_ENABLE_NEW_PASS_MANAGER) || LLVM_ENABLE_NEW_PASS_MANAGER == 0
-+static cl::opt<std::string> AesSeed("aesSeed", cl::init(""),
-+                                    cl::desc("seed for the AES-CTR PRNG"));
-+
-+static cl::opt<std::string> Seed("seed", cl::init(""),
-+                           cl::desc("seed for the random"));
-+#endif
-+
- // This option is used in simplifying testing SampleFDO optimizations for
- // profile loading.
- cl::opt<bool>
-@@ -220,6 +236,22 @@ PassManagerBuilder::PassManagerBuilder() {
-     PerformThinLTO = EnablePerformThinLTO;
-     DivergentTarget = false;
-     CallGraphProfile = true;
-+
-+    // Initialization of the global cryptographically
-+    // secure pseudo-random generator
-+#if !defined(LLVM_ENABLE_NEW_PASS_MANAGER) || LLVM_ENABLE_NEW_PASS_MANAGER == 0
-+    if(!AesSeed.empty()) {
-+        if(!llvm::cryptoutils->prng_seed(AesSeed.c_str())) {
-+          exit(1);
-+        }
-+    }
-+
-+    //random generator
-+    if(!Seed.empty()) {
-+        if(!llvm::cryptoutils->prng_seed(Seed.c_str()))
-+          exit(1);
-+    }
-+#endif
- }
- 
- PassManagerBuilder::~PassManagerBuilder() {
-@@ -673,7 +705,7 @@ void PassManagerBuilder::addVectorPasses(legacy::PassManagerBase &PM,
-     PM.add(createInstructionCombiningPass());
- }
- 
--void PassManagerBuilder::populateModulePassManager(
-+void PassManagerBuilder::populateModulePassManager( // PassBuilder::buildModuleOptimizationPipeline - in new PM!
-     legacy::PassManagerBase &MPM) {
-   // Whether this is a default or *LTO pre-link pipeline. The FullLTO post-link
-   // is handled separately, so just check this is not the ThinLTO post-link.
-@@ -693,6 +725,14 @@ void PassManagerBuilder::populateModulePassManager(
-   // Allow forcing function attributes as a debugging and tuning aid.
-   MPM.add(createForceFunctionAttrsLegacyPass());
- 
-+  MPM.add(createSplitBasicBlock());
-+  MPM.add(createBogus());
-+  #if LLVM_VERSION_MAJOR >= 9
-+    MPM.add(createLowerSwitchPass());
-+  #endif
-+  MPM.add(createFlattening());
-+  MPM.add(createStringObfuscation(false));
-+
-   // If all optimizations are disabled, just run the always-inline pass and,
-   // if enabled, the function merging pass.
-   if (OptLevel == 0) {
-@@ -721,6 +761,8 @@ void PassManagerBuilder::populateModulePassManager(
-       MPM.add(createGlobalDCEPass());
-     }
- 
-+    MPM.add(createSubstitution());
-+
-     addExtensionsToPM(EP_EnabledOnOptLevel0, MPM);
- 
-     if (PrepareForLTO || PrepareForThinLTO) {
-@@ -991,6 +1033,8 @@ void PassManagerBuilder::populateModulePassManager(
-   // flattening of blocks.
-   MPM.add(createDivRemPairsPass());
- 
-+  MPM.add(createSubstitution());
-+
-   // LoopSink (and other loop passes since the last simplifyCFG) might have
-   // resulted in single-entry-single-exit or empty blocks. Clean up the CFG.
-   MPM.add(createCFGSimplificationPass(
 diff --git a/llvm/lib/Transforms/Obfuscation/BogusControlFlow.cpp b/llvm/lib/Transforms/Obfuscation/BogusControlFlow.cpp
 new file mode 100644
-index 000000000000..82f733947233
+index 000000000000..e24f81c4619d
 --- /dev/null
 +++ b/llvm/lib/Transforms/Obfuscation/BogusControlFlow.cpp
-@@ -0,0 +1,701 @@
+@@ -0,0 +1,709 @@
 +//===- BogusControlFlow.cpp - BogusControlFlow Obfuscation pass ----------===//
 +//
 +//                     The LLVM Compiler Infrastructure
@@ -733,8 +624,9 @@ index 000000000000..82f733947233
 +// Options for the pass
 +const int defaultObfRate = 30, defaultObfTime = 1;
 +
-+static cl::opt<bool> BogusControlFlowFlag("bcf", cl::init(false),
-+                                      cl::desc("Enable bogus control flow"));
++static cl::opt<bool>
++    BogusControlFlowFlag("bcf", cl::init(false),
++                         cl::desc("Enable bogus control flow"));
 +
 +static cl::opt<int>
 +    ObfProbRate("bcf_prob",
@@ -750,16 +642,14 @@ index 000000000000..82f733947233
 +             cl::Optional);
 +
 +namespace {
-+struct BogusControlFlow : public FunctionPass {
-+  static char ID; // Pass identification
-+  BogusControlFlow() : FunctionPass(ID) {}
++struct BogusControlFlow {
 +
 +  /* runOnFunction
 +   *
 +   * Overwrite FunctionPass method to apply the transformation
 +   * to the function. See header for more details.
 +   */
-+  virtual bool runOnFunction(Function &F) {
++  bool runOnFunction(Function &F) {
 +    // Check if the percentage is correct
 +    auto probs = readAnnotate(&F, ObfProbRate.ArgStr);
 +    if (!probs.empty()) {
@@ -786,6 +676,8 @@ index 000000000000..82f733947233
 +    }
 +    // If fla annotations
 +    if (toObfuscate(BogusControlFlowFlag, &F, "bcf")) {
++      outs() << "Apply bogus control flow obfuscation for " << F.getName()
++             << "\n";
 +      bogus(F);
 +      doF(*F.getParent());
 +      return true;
@@ -882,7 +774,7 @@ index 000000000000..82f733947233
 +   * Add bogus flow to a given basic block, according to the header's
 +   * description
 +   */
-+  virtual void addBogusFlow(BasicBlock *basicBlock, Function &F) {
++  void addBogusFlow(BasicBlock *basicBlock, Function &F) {
 +
 +    // Split the block: first part with only the phi nodes and debug info and
 +    // terminator
@@ -979,9 +871,9 @@ index 000000000000..82f733947233
 +   * debug locations are adjusted to fit in the cloned basic block and
 +   * behave nicely.
 +   */
-+  virtual BasicBlock *createAlteredBasicBlock(BasicBlock *basicBlock,
-+                                              const Twine &Name = "gen",
-+                                              Function *F = 0) {
++  BasicBlock *createAlteredBasicBlock(BasicBlock *basicBlock,
++                                      const Twine &Name = "gen",
++                                      Function *F = 0) {
 +    // Useful to remap the informations concerning instructions.
 +    ValueToValueMapTy VMap;
 +    BasicBlock *alteredBB = llvm::CloneBasicBlock(basicBlock, VMap, Name, F);
@@ -1083,9 +975,9 @@ index 000000000000..82f733947233
 +            case 0:                                    // do nothing
 +              break;
 +            case 1:
-+              op2 = UnaryOperator::CreateFNeg(i->getOperand(0),*var,&*i);
-+              op1 = BinaryOperator::Create(Instruction::FAdd,op2,
-+                            i->getOperand(1),"gen",&*i);
++              op2 = UnaryOperator::CreateFNeg(i->getOperand(0), *var, &*i);
++              op1 = BinaryOperator::Create(Instruction::FAdd, op2,
++                                           i->getOperand(1), "gen", &*i);
 +              break;
 +            case 2:
 +              op = BinaryOperator::Create(Instruction::FSub, i->getOperand(0),
@@ -1254,8 +1146,10 @@ index 000000000000..82f733947233
 +    for (std::vector<Instruction *>::iterator i = toEdit.begin();
 +         i != toEdit.end(); ++i) {
 +      // if y < 10 || x*(x+1) % 2 == 0
-+      opX = new LoadInst(x->getType()->getElementType(), (Value *)x, "", (*i));
-+      opY = new LoadInst(y->getType()->getElementType(), (Value *)y, "", (*i));
++      opX = new LoadInst(Type::getInt32Ty(M.getContext()), (Value *)x, "",
++                         (*i)); // getElementType
++      opY = new LoadInst(Type::getInt32Ty(M.getContext()), (Value *)y, "",
++                         (*i)); // getElementType
 +
 +      op = BinaryOperator::Create(
 +          Instruction::Sub, (Value *)opX,
@@ -1305,19 +1199,24 @@ index 000000000000..82f733947233
 +};  // end of struct BogusControlFlow : public FunctionPass
 +} // namespace
 +
-+char BogusControlFlow::ID = 0;
-+static RegisterPass<BogusControlFlow> X("boguscf",
-+                                        "inserting bogus control flow");
++namespace obf_inner {
++void bogus(Function *f) {
++  BogusControlFlow bcf;
++  auto rate = ObfProbRate.getValue();
++  ObfProbRate.setValue(100);
++  bcf.bogus(*f);
++  bcf.doF(*f->getParent());
++  ObfProbRate.setValue(rate);
++}
++} // namespace obf_inner
 +
-+Pass *llvm::createBogus() { return new BogusControlFlow(); }
-+
-+PreservedAnalyses BogusControlFlowPass::run(Function& F, FunctionAnalysisManager& AM) {
++PreservedAnalyses BogusControlFlowPass::run(Function &F,
++                                            FunctionAnalysisManager &AM) {
 +  BogusControlFlow bcf;
 +  if (bcf.runOnFunction(F))
 +    return PreservedAnalyses::none();
 +  return PreservedAnalyses::all();
 +}
-+
 diff --git a/llvm/lib/Transforms/Obfuscation/CMakeLists.txt b/llvm/lib/Transforms/Obfuscation/CMakeLists.txt
 new file mode 100644
 index 000000000000..f9324e7ca16a
@@ -2598,10 +2497,10 @@ index 000000000000..baa49168d6f6
 +}
 diff --git a/llvm/lib/Transforms/Obfuscation/Flattening.cpp b/llvm/lib/Transforms/Obfuscation/Flattening.cpp
 new file mode 100644
-index 000000000000..9437a848407b
+index 000000000000..3a9c43623dd6
 --- /dev/null
 +++ b/llvm/lib/Transforms/Obfuscation/Flattening.cpp
-@@ -0,0 +1,256 @@
+@@ -0,0 +1,234 @@
 +//===- Flattening.cpp - Flattening Obfuscation pass------------------------===//
 +//
 +//                     The LLVM Compiler Infrastructure
@@ -2619,6 +2518,7 @@ index 000000000000..9437a848407b
 +#include "llvm/Transforms/Obfuscation/CryptoUtils.h"
 +#include "llvm/Transforms/Utils.h"
 +#include "llvm/InitializePasses.h"
++#include "llvm/IR/Constants.h"
 +
 +#define DEBUG_TYPE "flattening"
 +
@@ -2629,42 +2529,28 @@ index 000000000000..9437a848407b
 +
 +// Stats
 +STATISTIC(Flattened, "Functions flattened");
++PreservedAnalyses FlatteningPass::run(Function &F, FunctionAnalysisManager &AM){
++//     errs() << "FlatteningPass::run\n";
 +
-+namespace {
-+struct Flattening : public FunctionPass {
-+  static char ID; // Pass identification, replacement for typeid
-+
-+  Flattening() : FunctionPass(ID) {}
-+
-+  bool runOnFunction(Function &F);
-+  bool flatten(Function *f);
-+};
-+} // namespace
-+
-+char Flattening::ID = 0;
-+static RegisterPass<Flattening> X("flattening", "Call graph flattening");
-+Pass *llvm::createFlattening() { return new Flattening(); }
-+
-+bool Flattening::runOnFunction(Function &F) {
-+  Function *tmp = &F;
 +  // Do we obfuscate
-+  if (toObfuscate(FlatteningArg, tmp, "fla")) {
-+    if (flatten(tmp)) {
++  if (toObfuscate(FlatteningArg, &F, "fla")) {
++    outs() << "Apply flatten obfuscation for " << F.getName() << "\n";
++    if (obf_flatten(&F)) {
 +      ++Flattened;
 +    }
 +  }
 +
-+  return false;
-+}
-+
-+PreservedAnalyses FlatteningPass::run(Function &F, FunctionAnalysisManager &AM){
-+  Flattening fla;
-+  fla.runOnFunction(F);
-+
 +  return PreservedAnalyses::none();
 +}
 +
-+bool Flattening::flatten(Function *f) {
++
++namespace obf_inner{
++void flatten(Function *f){
++  obf_flatten(f);
++}
++}
++
++bool llvm::obf_flatten(Function *f) {
 +  std::vector<BasicBlock *> origBB;
 +  BasicBlock *loopEntry;
 +  BasicBlock *loopEnd;
@@ -2676,15 +2562,6 @@ index 000000000000..9437a848407b
 +  char scrambling_key[16];
 +  llvm::cryptoutils->get_bytes(scrambling_key, 16);
 +  // END OF SCRAMBLER
-+
-+#if LLVM_VERSION_MAJOR >= 9
-+    // >=9.0, LowerSwitchPass depends on LazyValueInfoWrapperPass, which cause AssertError.
-+    // So I move LowerSwitchPass into register function, just before FlatteningPass.
-+#else
-+  // Lower switch
-+  FunctionPass *lower = createLowerSwitchPass();
-+  lower->runOnFunction(*f);
-+#endif
 +
 +  // Save all original BB
 +  for (Function::iterator i = f->begin(); i != f->end(); ++i) {
@@ -2743,7 +2620,7 @@ index 000000000000..9437a848407b
 +  loopEntry = BasicBlock::Create(f->getContext(), "loopEntry", f, insert);
 +  loopEnd = BasicBlock::Create(f->getContext(), "loopEnd", f, insert);
 +
-+  load = new LoadInst(switchVar->getType()->getElementType(), switchVar, "switchVar", loopEntry);
++  load = new LoadInst(Type::getInt32Ty(f->getContext()), switchVar, "switchVar", loopEntry); // getElementType
 +
 +  // Move first BB on top
 +  insert->moveBefore(loopEntry);
@@ -2941,10 +2818,10 @@ index 000000000000..0a6bf1ddcc42
 +
 diff --git a/llvm/lib/Transforms/Obfuscation/SplitBasicBlocks.cpp b/llvm/lib/Transforms/Obfuscation/SplitBasicBlocks.cpp
 new file mode 100644
-index 000000000000..9a692dcb73fb
+index 000000000000..11ff1760b975
 --- /dev/null
 +++ b/llvm/lib/Transforms/Obfuscation/SplitBasicBlocks.cpp
-@@ -0,0 +1,152 @@
+@@ -0,0 +1,151 @@
 +//===- SplitBasicBlock.cpp - SplitBasicBlokc Obfuscation pass--------------===//
 +//
 +//                     The LLVM Compiler Infrastructure
@@ -2970,16 +2847,13 @@ index 000000000000..9a692dcb73fb
 +STATISTIC(Split, "Basicblock splitted");
 +
 +static cl::opt<bool> SplitFlag("split", cl::init(false),
-+                           cl::desc("Enable basic block splitting"));
++                               cl::desc("Enable basic block splitting"));
 +
 +static cl::opt<int> SplitNum("split_num", cl::init(2),
 +                             cl::desc("Split <split_num> time each BB"));
 +
 +namespace {
-+struct SplitBasicBlock : public FunctionPass {
-+  static char ID; // Pass identification, replacement for typeid
-+
-+  SplitBasicBlock() : FunctionPass(ID) {}
++struct SplitBasicBlock {
 +
 +  bool runOnFunction(Function &F);
 +  void split(Function *f);
@@ -2989,14 +2863,15 @@ index 000000000000..9a692dcb73fb
 +};
 +} // namespace
 +
-+char SplitBasicBlock::ID = 0;
-+static RegisterPass<SplitBasicBlock> X("splitbbl", "BasicBlock splitting");
-+
-+Pass *llvm::createSplitBasicBlock() {
-+  return new SplitBasicBlock();
++namespace obf_inner {
++void split(Function *f) {
++  SplitBasicBlock split_;
++  split_.split(f);
 +}
++} // namespace obf_inner
 +
-+PreservedAnalyses SplitBasicBlockPass::run(Function &F, FunctionAnalysisManager &AM){
++PreservedAnalyses SplitBasicBlockPass::run(Function &F,
++                                           FunctionAnalysisManager &AM) {
 +  SplitBasicBlock split;
 +  split.runOnFunction(F);
 +  return PreservedAnalyses::none();
@@ -3020,6 +2895,7 @@ index 000000000000..9a692dcb73fb
 +
 +  // Do we obfuscate
 +  if (toObfuscate(SplitFlag, tmp, "split")) {
++    outs() << "Apply split obfuscation for " << F.getName() << "\n";
 +    split(tmp);
 +    ++Split;
 +  }
@@ -3099,16 +2975,18 @@ index 000000000000..9a692dcb73fb
 +}
 diff --git a/llvm/lib/Transforms/Obfuscation/StringObfuscation.cpp b/llvm/lib/Transforms/Obfuscation/StringObfuscation.cpp
 new file mode 100755
-index 000000000000..7a20c9387ebc
+index 000000000000..ef9d92484e30
 --- /dev/null
 +++ b/llvm/lib/Transforms/Obfuscation/StringObfuscation.cpp
-@@ -0,0 +1,229 @@
-+#include <string>
+@@ -0,0 +1,248 @@
 +#include <sstream>
++#include <string>
 +
 +#include "llvm/ADT/Statistic.h"
-+#include "llvm/IR/Function.h"
 +#include "llvm/IR/Constants.h"
++#include "llvm/IR/Function.h"
++#include "llvm/IR/IRBuilder.h"
++#include "llvm/IR/Instructions.h"
 +#include "llvm/IR/Module.h"
 +#include "llvm/IR/Value.h"
 +#include "llvm/Pass.h"
@@ -3116,228 +2994,245 @@ index 000000000000..7a20c9387ebc
 +#include "llvm/Transforms/Obfuscation/CryptoUtils.h"
 +#include "llvm/Transforms/Obfuscation/StringObfuscation.h"
 +#include "llvm/Transforms/Obfuscation/Utils.h"
-+#include "llvm/IR/IRBuilder.h"
 +#include "llvm/Transforms/Utils/ModuleUtils.h"
-+#include "llvm/IR/Instructions.h"
 +
 +using namespace llvm;
 +
 +static cl::opt<bool> StringObf("sobf", cl::init(false),
-+                           cl::desc("Enable the string obfuscation"));
++                               cl::desc("Enable the string obfuscation"));
 +
 +#define DEBUG_TYPE "objdiv"
 +
 +STATISTIC(GlobalsEncoded, "Counts number of global variables encoded");
 +
++namespace obf_inner {
++void flatten(Function *f);
++void substitution(Function *f);
++void split(Function *f);
++void bogus(Function *f);
++} // namespace obf_inner
++
 +namespace llvm {
 +
-+        struct encVar {
-+                public:
-+                        GlobalVariable *var;
-+                        uint8_t key;
-+        };
++struct encVar {
++public:
++  GlobalVariable *var;
++  uint8_t key_xor;
++  uint8_t key_cesar;
++};
 +
-+        class StringObfuscationPass: public llvm::ModulePass {
-+                public:
-+                static char ID; // pass identification
-+                bool is_flag = false;
-+                StringObfuscationPass() : ModulePass(ID) {}
-+                StringObfuscationPass(bool flag) : ModulePass(ID)
-+                {
-+                    is_flag = flag;
-+                }
++class StringObfuscationPass {
++public:
++  bool is_flag = false;
++  StringObfuscationPass() {}
++  StringObfuscationPass(bool flag) { is_flag = flag; }
 +
-+                virtual bool runOnModule(Module &M) {
-+                        if(!is_flag)
-+                            return false;
-+                        std::vector<GlobalVariable*> toDelConstGlob;
-+                        //std::vector<GlobalVariable*> encGlob;
-+                        std::vector<encVar*> encGlob;
-+                        for (Module::global_iterator gi = M.global_begin(), ge = M.global_end();
-+                                                gi != ge; ++gi) {
-+                                // Loop over all global variables
-+                                GlobalVariable* gv = &(*gi);
-+                                //errs() << "Global var " << gv->getName();
-+                                std::string::size_type str_idx = gv->getName().str().find(".str.");
-+                                std::string section(gv->getSection());
++  bool runOnModule(Module &M) {
++    if (!is_flag)
++      return false;
++    std::vector<GlobalVariable *> toDelConstGlob;
++    // std::vector<GlobalVariable*> encGlob;
++    std::vector<encVar *> encGlob;
++    for (Module::global_iterator gi = M.global_begin(), ge = M.global_end();
++         gi != ge; ++gi) {
++      // Loop over all global variables
++      GlobalVariable *gv = &(*gi);
++      // errs() << "Global var " << gv->getName();
++      //                                 std::string::size_type str_idx =
++      //                                 gv->getName().str().find(".str.");
++      std::string section(gv->getSection());
 +
-+                                // Let's encode the static ones
-+                                if (gv->getName().str().substr(0,4)==".str"&&
-+                                  gv->isConstant() &&
-+                                gv->hasInitializer() &&
-+                                isa<ConstantDataSequential>(gv->getInitializer()) &&
-+                                section != "llvm.metadata" &&
-+                                section.find("__objc_methname") == std::string::npos
-+                              /*&&gv->getType()->getArrayElementType()->getArrayElementType()->isIntegerTy()*/) {
-+                                        ++GlobalsEncoded;
-+                                        //errs() << " is constant";
++      // Let's encode the static ones
++      if (gv->getName().str().substr(0, 4) == ".str" && gv->isConstant() &&
++          gv->hasInitializer() &&
++          isa<ConstantDataSequential>(gv->getInitializer()) &&
++          section != "llvm.metadata" &&
++          section.find("__objc_methname") == std::string::npos
++          /*&&gv->getType()->getArrayElementType()->getArrayElementType()->isIntegerTy()*/) {
++        ++GlobalsEncoded;
++        // errs() << " is constant";
 +
-+                                        // Duplicate global variable
-+                                        GlobalVariable *dynGV = new GlobalVariable(M,
-+                                                                                  gv->getType()->getElementType(),
-+                                                                                  !(gv->isConstant()), gv->getLinkage(),
-+                                                                                  (Constant*) 0, gv->getName(),
-+                                                                                  (GlobalVariable*) 0,
-+                                                                                  gv->getThreadLocalMode(),
-+                                                                                  gv->getType()->getAddressSpace());
-+                                        // dynGV->copyAttributesFrom(gv);
-+                                        dynGV->setInitializer(gv->getInitializer());
++        // Duplicate global variable
++        GlobalVariable *dynGV = new GlobalVariable(
++            M,
++            gv->getValueType(), // getElementType
++            !(gv->isConstant()), gv->getLinkage(), (Constant *)0, gv->getName(),
++            (GlobalVariable *)0, gv->getThreadLocalMode(),
++            gv->getType()->getAddressSpace());
++        // dynGV->copyAttributesFrom(gv);
++        dynGV->setInitializer(gv->getInitializer());
 +
-+                                        Constant *initializer = gv->getInitializer();
-+                                        ConstantDataSequential *cdata = dyn_cast<ConstantDataSequential>(initializer);
-+                                        if (cdata) {
-+                                                const char *orig = cdata->getRawDataValues().data();
-+                                                unsigned len = cdata->getNumElements()*cdata->getElementByteSize();
++        Constant *initializer = gv->getInitializer();
++        ConstantDataSequential *cdata =
++            dyn_cast<ConstantDataSequential>(initializer);
++        if (cdata) {
++          const char *orig = cdata->getRawDataValues().data();
++          unsigned len = cdata->getNumElements() * cdata->getElementByteSize();
 +
-+                                                encVar *cur = new encVar();
-+                                                cur->var = dynGV;
-+                                                cur->key = llvm::cryptoutils->get_uint8_t();
-+                                                // casting away const is undef. behavior in C++
-+                                                // TODO a clean implementation would retrieve the data, generate a new constant
-+                                                // set the correct type, and copy the data over.
-+                                                //char *encr = new char[len];
-+                                                //Constant *initnew = ConstantDataArray::getString(M.getContext(), encr, true);
-+                                                char *encr = const_cast<char *>(orig);
-+                                                // Simple xor encoding
-+                                                for (unsigned i = 0; i != len; ++i) {
-+                                                        encr[i] = orig[i]^cur->key;
-+                                                }
++          encVar *cur = new encVar();
++          cur->var = dynGV;
++          cur->key_xor = llvm::cryptoutils->get_uint8_t();
++          if (cur->key_xor > 0x7F)
++            cur->key_xor /= 2;
++          cur->key_cesar = llvm::cryptoutils->get_uint8_t();
++          if (cur->key_cesar > 0x7F)
++            cur->key_cesar /= 2;
++          // casting away const is undef. behavior in C++
++          // TODO a clean implementation would retrieve the data, generate a new
++          // constant set the correct type, and copy the data over.
++          // char *encr = new char[len];
++          // Constant *initnew = ConstantDataArray::getString(M.getContext(),
++          // encr, true);
++          char *encr = const_cast<char *>(orig);
++          // Simple xor encoding
++          for (unsigned i = 0; i != len; ++i) {
++            encr[i] = orig[i] ^ cur->key_xor;
++            encr[i] += cur->key_cesar;
++          }
 +
-+                                                // FIXME Second part of the unclean hack.
-+                                                dynGV->setInitializer(initializer);
++          // FIXME Second part of the unclean hack.
++          dynGV->setInitializer(initializer);
 +
-+                                                // Prepare to add decode function for this variable
-+                                                encGlob.push_back(cur);
-+                                        } else {
-+                                                // just copying default initializer for now
-+                                                dynGV->setInitializer(initializer);
-+                                        }
++          // Prepare to add decode function for this variable
++          encGlob.push_back(cur);
++        } else {
++          // just copying default initializer for now
++          dynGV->setInitializer(initializer);
++        }
 +
-+                                        // redirect references to new GV and remove old one
-+                                        gv->replaceAllUsesWith(dynGV);
-+                                        toDelConstGlob.push_back(gv);
++        // redirect references to new GV and remove old one
++        gv->replaceAllUsesWith(dynGV);
++        toDelConstGlob.push_back(gv);
++      }
++    }
 +
-+                                }
-+                        }
++    // actuallte delete marked globals
++    for (unsigned i = 0, e = toDelConstGlob.size(); i != e; ++i)
++      toDelConstGlob[i]->eraseFromParent();
 +
-+                        // actuallte delete marked globals
-+                        for (unsigned i = 0, e = toDelConstGlob.size(); i != e; ++i)
-+                                toDelConstGlob[i]->eraseFromParent();
++    addDecodeFunction(&M, &encGlob);
 +
-+                        addDecodeFunction(&M, &encGlob);
++    return true;
++  }
 +
++private:
++  void addDecodeFunction(Module *mod, std::vector<encVar *> *gvars) {
++    // Declare and add the function definition
++    // errs()<<"Successful enter decode function"<<"\n";
++    std::vector<Type *> FuncTy_args;
++    FunctionType *FuncTy = FunctionType::get(
++        /*Result=*/Type::getVoidTy(mod->getContext()), // returning void
++        /*Params=*/FuncTy_args,                        // taking no args
++        /*isVarArg=*/false);
++    uint64_t StringObfDecodeRandomName = cryptoutils->get_uint64_t();
++    std::string random_str;
++    std::stringstream random_stream;
++    random_stream << StringObfDecodeRandomName;
++    random_stream >> random_str;
++    StringObfDecodeRandomName++;
 +
-+                        return true;
-+                }
++    auto funccallee =
++        mod->getOrInsertFunction(".datadiv_decode" + random_str, FuncTy);
++    llvm::Value *c = funccallee.getCallee();
 +
-+               private:
-+               void addDecodeFunction(Module *mod, std::vector<encVar*> *gvars) {
-+                        // Declare and add the function definition
-+                        //errs()<<"Successful enter decode function"<<"\n";
-+                        std::vector<Type*>FuncTy_args;
-+                        FunctionType* FuncTy = FunctionType::get(
-+                          /*Result=*/Type::getVoidTy(mod->getContext()),  // returning void
-+                          /*Params=*/FuncTy_args,  // taking no args
-+                          /*isVarArg=*/false);
-+                        uint64_t StringObfDecodeRandomName = cryptoutils->get_uint64_t();
-+                        std::string  random_str;
-+                        std::stringstream random_stream;
-+                        random_stream << StringObfDecodeRandomName;
-+                        random_stream >> random_str;
-+                        StringObfDecodeRandomName++;
++    Function *fdecode = cast<Function>(c);
++    fdecode->setCallingConv(CallingConv::C);
 +
-+                        auto funccallee = mod->getOrInsertFunction(".datadiv_decode" + random_str, FuncTy);
-+                        llvm::Value* c = funccallee.getCallee();
++    BasicBlock *entry = BasicBlock::Create(mod->getContext(), "entry", fdecode);
 +
-+                        Function* fdecode = cast<Function>(c);
-+                        fdecode->setCallingConv(CallingConv::C);
++    IRBuilder<> builder(mod->getContext());
++    builder.SetInsertPoint(entry);
 +
++    for (unsigned i = 0, e = gvars->size(); i != e; ++i) {
++      GlobalVariable *gvar = (*gvars)[i]->var;
++      uint8_t key_xor = (*gvars)[i]->key_xor;
++      uint8_t key_cesar = (*gvars)[i]->key_cesar;
 +
-+                        BasicBlock* entry = BasicBlock::Create(mod->getContext(), "entry", fdecode);
++      Constant *init = gvar->getInitializer();
++      ConstantDataSequential *cdata = dyn_cast<ConstantDataSequential>(init);
 +
-+                        IRBuilder<> builder(mod->getContext());
-+                        builder.SetInsertPoint(entry);
++      unsigned len = cdata->getNumElements() * cdata->getElementByteSize();
++      --len;
 +
++      BasicBlock *preHeaderBB = builder.GetInsertBlock();
++      BasicBlock *for_body =
++          BasicBlock::Create(mod->getContext(), "for-body", fdecode);
++      BasicBlock *for_end =
++          BasicBlock::Create(mod->getContext(), "for-end", fdecode);
++      builder.CreateBr(for_body);
++      builder.SetInsertPoint(for_body);
++      PHINode *variable =
++          builder.CreatePHI(Type::getInt32Ty(mod->getContext()), 2, "i");
++      Value *startValue = builder.getInt32(0);
++      Value *endValue = builder.getInt32(len);
++      variable->addIncoming(startValue, preHeaderBB);
++      /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 +
-+                        for (unsigned i = 0, e = gvars->size(); i != e; ++i) {
-+                                GlobalVariable *gvar = (*gvars)[i]->var;
-+                                uint8_t key = (*gvars)[i]->key;
++      // LoadInst *Load=builder.CreateLoad(gvar);
++      // errs()<<"Load: "<<*(Load->getPointerOperand())<<"\n";
++      Value *indexList[2] = {ConstantInt::get(variable->getType(), 0),
++                             variable};
++      Value *const_key_cesar = builder.getInt8(key_cesar);
++      {
++        Value *GEP =
++            builder.CreateGEP(gvar->getValueType(), gvar,
++                              ArrayRef<Value *>(indexList, 2), "arrayIdx");
++        LoadInst *loadElement = builder.CreateAlignedLoad(GEP->getType(), GEP, Align(1), false);
++        Value *Cesar = builder.CreateSub(loadElement, const_key_cesar, "cesar");
++        builder.CreateAlignedStore(Cesar, GEP, Align(1), false);
++      }
++      Value *const_key_xor = builder.getInt8(key_xor);
++      {
++        Value *GEP =
++            builder.CreateGEP(gvar->getValueType(), gvar,
++                              ArrayRef<Value *>(indexList, 2), "arrayIdx");
++        LoadInst *loadElement = builder.CreateAlignedLoad(GEP->getType(), GEP, Align(1), false);
++        // errs()<<"Type: "<<*loadElement<<"\n";
++        // CastInst* extended = new ZExtInst(const_key, loadElement->getType(),
++        // "extended", for_body); Value* extended =
++        // builder.CreateZExtOrBitCast(const_key,
++        // loadElement->getType(),"extended");
++        Value *Xor = builder.CreateXor(loadElement, const_key_xor, "xor");
++        builder.CreateAlignedStore(Xor, GEP, Align(1), false);
++      }
 +
-+                                Constant *init = gvar->getInitializer();
-+                                ConstantDataSequential *cdata = dyn_cast<ConstantDataSequential>(init);
++      ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
++      Value *stepValue = builder.getInt32(1);
++      Value *nextValue = builder.CreateAdd(variable, stepValue, "next-value");
++      Value *endCondition =
++          builder.CreateICmpULT(variable, endValue, "end-condition");
++      endCondition = builder.CreateICmpNE(endCondition, builder.getInt1(0),
++                                          "loop-condition");
++      BasicBlock *loopEndBB = builder.GetInsertBlock();
++      builder.CreateCondBr(endCondition, loopEndBB, for_end);
++      builder.SetInsertPoint(for_end);
++      variable->addIncoming(nextValue, loopEndBB);
++    }
++    builder.CreateRetVoid();
++    appendToGlobalCtors(*mod, fdecode, 0);
++    obf_inner::flatten(fdecode);
++    obf_inner::bogus(fdecode);
++    outs() << "Apply string obfuscation for " << mod->getName() << "\n";
++  }
++};
 +
-+                                unsigned len = cdata->getNumElements()*cdata->getElementByteSize();
-+                                --len;
++} // namespace llvm
 +
-+                                BasicBlock *preHeaderBB=builder.GetInsertBlock();
-+                                BasicBlock* for_body = BasicBlock::Create(mod->getContext(), "for-body", fdecode);
-+                                BasicBlock* for_end = BasicBlock::Create(mod->getContext(), "for-end", fdecode);
-+                                builder.CreateBr(for_body);
-+                                builder.SetInsertPoint(for_body);
-+                                PHINode *variable = builder.CreatePHI(Type::getInt32Ty(mod->getContext()), 2, "i");
-+                                Value *startValue = builder.getInt32(0);
-+                                Value *endValue = builder.getInt32(len);
-+                                variable->addIncoming(startValue, preHeaderBB);
-+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
++llvm::PreservedAnalyses
++llvm::StringObfuscationNewPass::run(llvm::Module &M,
++                                    llvm::ModuleAnalysisManager &AM) {
++  llvm::StringObfuscationPass sobf(StringObf);
++  if (sobf.runOnModule(M))
++    return PreservedAnalyses::all();
 +
-+                                //LoadInst *Load=builder.CreateLoad(gvar);
-+                                //errs()<<"Load: "<<*(Load->getPointerOperand())<<"\n";
-+                                Value* indexList[2] = {ConstantInt::get(variable->getType(), 0), variable};
-+                                Value *const_key=builder.getInt8(key);
-+                                
-+                                Value *GEP=builder.CreateGEP(gvar->getType()->getScalarType()->getPointerElementType(),gvar,ArrayRef<Value*>(indexList, 2),"arrayIdx");
-+                                LoadInst *loadElement=builder.CreateLoad(GEP->getType()->getScalarType()->getPointerElementType(),GEP,false);
-+                                loadElement->setAlignment(Align(1));
-+                                //errs()<<"Type: "<<*loadElement<<"\n";
-+                                //CastInst* extended = new ZExtInst(const_key, loadElement->getType(), "extended", for_body);
-+                                //Value* extended = builder.CreateZExtOrBitCast(const_key, loadElement->getType(),"extended");
-+                                Value *Xor = builder.CreateXor(loadElement,const_key,"xor");
-+                                StoreInst *Store = builder.CreateStore(Xor, GEP,false);
-+                                Store->setAlignment(Align(1));
-+
-+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-+                                Value *stepValue = builder.getInt32(1);
-+                                Value *nextValue = builder.CreateAdd(variable, stepValue, "next-value");
-+                                Value *endCondition = builder.CreateICmpULT(variable, endValue, "end-condition");
-+                                endCondition = builder.CreateICmpNE(endCondition, builder.getInt1(0), "loop-condition");
-+                                BasicBlock *loopEndBB = builder.GetInsertBlock();
-+                                builder.CreateCondBr(endCondition, loopEndBB, for_end);
-+                                builder.SetInsertPoint(for_end);
-+                                variable->addIncoming(nextValue, loopEndBB);
-+
-+                              }
-+                              builder.CreateRetVoid();
-+                              appendToGlobalCtors(*mod,fdecode,0);
-+
-+
-+                }
-+
-+        };
-+
-+}
-+
-+llvm::PreservedAnalyses llvm::StringObfuscationNewPass::run(llvm::Module &M, llvm::ModuleAnalysisManager &AM)
-+{
-+        llvm::StringObfuscationPass sobf(StringObf);
-+        if (sobf.runOnModule(M))
-+                return PreservedAnalyses::all();
-+
-+        return PreservedAnalyses::none();
-+}
-+
-+
-+char StringObfuscationPass::ID = 0;
-+static RegisterPass<StringObfuscationPass> X("GVDiv", "Global variable (i.e., const char*) diversification pass", false, true);
-+
-+Pass * llvm::createStringObfuscation(bool flag) {
-+    return new StringObfuscationPass(flag);
++  return PreservedAnalyses::none();
 +}
 diff --git a/llvm/lib/Transforms/Obfuscation/Substitution.cpp b/llvm/lib/Transforms/Obfuscation/Substitution.cpp
 new file mode 100644
-index 000000000000..9cf2fd709546
+index 000000000000..47273b124344
 --- /dev/null
 +++ b/llvm/lib/Transforms/Obfuscation/Substitution.cpp
-@@ -0,0 +1,593 @@
+@@ -0,0 +1,626 @@
 +//===- Substitution.cpp - Substitution Obfuscation pass--------------------===//
 +//
 +//                     The LLVM Compiler Infrastructure
@@ -3352,6 +3247,7 @@ index 000000000000..9cf2fd709546
 +//===----------------------------------------------------------------------===//
 +
 +#include "llvm/Transforms/Obfuscation/Substitution.h"
++#include "llvm/IR/Constants.h"
 +#include "llvm/IR/Intrinsics.h"
 +#include "llvm/IR/LLVMContext.h"
 +#include "llvm/Support/raw_ostream.h"
@@ -3367,8 +3263,9 @@ index 000000000000..9cf2fd709546
 +#define NUMBER_OR_SUBST 2
 +#define NUMBER_XOR_SUBST 2
 +
-+static cl::opt<bool> SubstitutionFlag("sub", cl::init(false),
-+                                  cl::desc("Enable instruction substitutions"));
++static cl::opt<bool>
++    SubstitutionFlag("sub", cl::init(false),
++                     cl::desc("Enable instruction substitutions"));
 +
 +static cl::opt<int>
 +    ObfTimes("sub_loop",
@@ -3388,15 +3285,14 @@ index 000000000000..9cf2fd709546
 +
 +namespace {
 +
-+struct Substitution : public FunctionPass {
-+  static char ID; // Pass identification, replacement for typeid
++struct Substitution {
 +  void (Substitution::*funcAdd[NUMBER_ADD_SUBST])(BinaryOperator *bo);
 +  void (Substitution::*funcSub[NUMBER_SUB_SUBST])(BinaryOperator *bo);
 +  void (Substitution::*funcAnd[NUMBER_AND_SUBST])(BinaryOperator *bo);
 +  void (Substitution::*funcOr[NUMBER_OR_SUBST])(BinaryOperator *bo);
 +  void (Substitution::*funcXor[NUMBER_XOR_SUBST])(BinaryOperator *bo);
 +
-+  Substitution() : FunctionPass(ID) {
++  Substitution() {
 +    funcAdd[0] = &Substitution::addNeg;
 +    funcAdd[1] = &Substitution::addDoubleNeg;
 +    funcAdd[2] = &Substitution::addRand;
@@ -3439,10 +3335,6 @@ index 000000000000..9cf2fd709546
 +};
 +} // namespace
 +
-+char Substitution::ID = 0;
-+static RegisterPass<Substitution> X("substitution", "operators substitution");
-+Pass *llvm::createSubstitution() { return new Substitution(); }
-+
 +bool Substitution::runOnFunction(Function &F) {
 +  Function *tmp = &F;
 +
@@ -3460,13 +3352,24 @@ index 000000000000..9cf2fd709546
 +
 +  // Do we obfuscate
 +  if (toObfuscate(SubstitutionFlag, tmp, "sub")) {
++    outs() << "Apply substitution obfuscation for " << F.getName() << "\n";
 +    substitute(tmp);
 +    return true;
 +  }
 +  return false;
 +}
 +
-+PreservedAnalyses SubstitutionPass::run(Function &F, FunctionAnalysisManager &AM){
++namespace obf_inner {
++void substitution(Function *f) {
++  if (ObfTimes <= 0)
++    ObfTimes.setValue(1);
++  Substitution sub;
++  sub.substitute(f);
++}
++} // namespace obf_inner
++
++PreservedAnalyses SubstitutionPass::run(Function &F,
++                                        FunctionAnalysisManager &AM) {
 +  Substitution sub;
 +  if (sub.runOnFunction(F)) {
 +    return PreservedAnalyses::none();
@@ -3549,6 +3452,8 @@ index 000000000000..9cf2fd709546
 +// Implementation of a = b - (-c)
 +void Substitution::addNeg(BinaryOperator *bo) {
 +  BinaryOperator *op = NULL;
++  if (bo->getType()->getTypeID() == Type::TypeID::PointerTyID)
++    return;
 +
 +  // Create sub
 +  if (bo->getOpcode() == Instruction::Add) {
@@ -3571,7 +3476,9 @@ index 000000000000..9cf2fd709546
 +// Implementation of a = -(-b + (-c))
 +void Substitution::addDoubleNeg(BinaryOperator *bo) {
 +  BinaryOperator *op, *op2 = NULL;
-+  UnaryOperator *op3, *op4; 
++  UnaryOperator *op3, *op4;
++  if (bo->getType()->getTypeID() == Type::TypeID::PointerTyID)
++    return;
 +
 +  if (bo->getOpcode() == Instruction::Add) {
 +    op = BinaryOperator::CreateNeg(bo->getOperand(0), "", bo);
@@ -3585,20 +3492,20 @@ index 000000000000..9cf2fd709546
 +    // op->setHasNoUnsignedWrap(bo->hasNoUnsignedWrap());
 +
 +  } else {
-+    op3 = UnaryOperator::CreateFNeg(bo->getOperand(0), "", bo); 
-+    op4 = UnaryOperator::CreateFNeg(bo->getOperand(1), "", bo); 
-+    op = BinaryOperator::Create(Instruction::FAdd, op3, op4, "", bo); 
-+    op3 = UnaryOperator::CreateFNeg(op, "", bo); 
++    op3 = UnaryOperator::CreateFNeg(bo->getOperand(0), "", bo);
++    op4 = UnaryOperator::CreateFNeg(bo->getOperand(1), "", bo);
++    op = BinaryOperator::Create(Instruction::FAdd, op3, op4, "", bo);
++    op3 = UnaryOperator::CreateFNeg(op, "", bo);
 +
-+    bo->replaceAllUsesWith(op3); 
-+
++    bo->replaceAllUsesWith(op3);
 +  }
-+
 +}
 +
 +// Implementation of  r = rand (); a = b + r; a = a + c; a = a - r
 +void Substitution::addRand(BinaryOperator *bo) {
 +  BinaryOperator *op = NULL;
++  if (bo->getType()->getTypeID() == Type::TypeID::PointerTyID)
++    return;
 +
 +  if (bo->getOpcode() == Instruction::Add) {
 +    Type *ty = bo->getType();
@@ -3629,6 +3536,8 @@ index 000000000000..9cf2fd709546
 +// Implementation of r = rand (); a = b - r; a = a + b; a = a + r
 +void Substitution::addRand2(BinaryOperator *bo) {
 +  BinaryOperator *op = NULL;
++  if (bo->getType()->getTypeID() == Type::TypeID::PointerTyID)
++    return;
 +
 +  if (bo->getOpcode() == Instruction::Add) {
 +    Type *ty = bo->getType();
@@ -3659,6 +3568,8 @@ index 000000000000..9cf2fd709546
 +// Implementation of a = b + (-c)
 +void Substitution::subNeg(BinaryOperator *bo) {
 +  BinaryOperator *op = NULL;
++  if (bo->getType()->getTypeID() == Type::TypeID::PointerTyID)
++    return;
 +
 +  if (bo->getOpcode() == Instruction::Sub) {
 +    op = BinaryOperator::CreateNeg(bo->getOperand(1), "", bo);
@@ -3669,8 +3580,9 @@ index 000000000000..9cf2fd709546
 +    // op->setHasNoSignedWrap(bo->hasNoSignedWrap());
 +    // op->setHasNoUnsignedWrap(bo->hasNoUnsignedWrap());
 +  } else {
-+    auto op1 = UnaryOperator::CreateFNeg(bo->getOperand(1), "", bo); 
-+    op = BinaryOperator::Create(Instruction::FAdd, bo->getOperand(0), op1, "", bo); 
++    auto op1 = UnaryOperator::CreateFNeg(bo->getOperand(1), "", bo);
++    op = BinaryOperator::Create(Instruction::FAdd, bo->getOperand(0), op1, "",
++                                bo);
 +  }
 +
 +  bo->replaceAllUsesWith(op);
@@ -3679,6 +3591,8 @@ index 000000000000..9cf2fd709546
 +// Implementation of  r = rand (); a = b + r; a = a - c; a = a - r
 +void Substitution::subRand(BinaryOperator *bo) {
 +  BinaryOperator *op = NULL;
++  if (bo->getType()->getTypeID() == Type::TypeID::PointerTyID)
++    return;
 +
 +  if (bo->getOpcode() == Instruction::Sub) {
 +    Type *ty = bo->getType();
@@ -3709,6 +3623,8 @@ index 000000000000..9cf2fd709546
 +// Implementation of  r = rand (); a = b - r; a = a - c; a = a + r
 +void Substitution::subRand2(BinaryOperator *bo) {
 +  BinaryOperator *op = NULL;
++  if (bo->getType()->getTypeID() == Type::TypeID::PointerTyID)
++    return;
 +
 +  if (bo->getOpcode() == Instruction::Sub) {
 +    Type *ty = bo->getType();
@@ -3739,6 +3655,8 @@ index 000000000000..9cf2fd709546
 +// Implementation of a = b & c => a = (b^~c)& b
 +void Substitution::andSubstitution(BinaryOperator *bo) {
 +  BinaryOperator *op = NULL;
++  if (bo->getType()->getTypeID() == Type::TypeID::PointerTyID)
++    return;
 +
 +  // Create NOT on second operand => ~c
 +  op = BinaryOperator::CreateNot(bo->getOperand(1), "", bo);
@@ -3754,6 +3672,8 @@ index 000000000000..9cf2fd709546
 +
 +// Implementation of a = a && b <=> !(!a | !b) && (r | !r)
 +void Substitution::andSubstitutionRand(BinaryOperator *bo) {
++  if (bo->getType()->getTypeID() == Type::TypeID::PointerTyID)
++    return;
 +  // Copy of the BinaryOperator type to create the random number with the
 +  // same type of the operands
 +  Type *ty = bo->getType();
@@ -3790,6 +3710,8 @@ index 000000000000..9cf2fd709546
 +
 +// Implementation of a = b | c => a = (b & c) | (b ^ c)
 +void Substitution::orSubstitutionRand(BinaryOperator *bo) {
++  if (bo->getType()->getTypeID() == Type::TypeID::PointerTyID)
++    return;
 +
 +  Type *ty = bo->getType();
 +  ConstantInt *co =
@@ -3849,6 +3771,8 @@ index 000000000000..9cf2fd709546
 +
 +void Substitution::orSubstitution(BinaryOperator *bo) {
 +  BinaryOperator *op = NULL;
++  if (bo->getType()->getTypeID() == Type::TypeID::PointerTyID)
++    return;
 +
 +  // Creating first operand (b & c)
 +  op = BinaryOperator::Create(Instruction::And, bo->getOperand(0),
@@ -3866,6 +3790,8 @@ index 000000000000..9cf2fd709546
 +// Implementation of a = a ~ b => a = (!a && b) || (a && !b)
 +void Substitution::xorSubstitution(BinaryOperator *bo) {
 +  BinaryOperator *op = NULL;
++  if (bo->getType()->getTypeID() == Type::TypeID::PointerTyID)
++    return;
 +
 +  // Create NOT on first operand
 +  op = BinaryOperator::CreateNot(bo->getOperand(0), "", bo); // !a
@@ -3893,6 +3819,8 @@ index 000000000000..9cf2fd709546
 +// note : r is a random number
 +void Substitution::xorSubstitutionRand(BinaryOperator *bo) {
 +  BinaryOperator *op = NULL;
++  if (bo->getType()->getTypeID() == Type::TypeID::PointerTyID)
++    return;
 +
 +  Type *ty = bo->getType();
 +  ConstantInt *co =
@@ -3933,11 +3861,12 @@ index 000000000000..9cf2fd709546
 +}
 diff --git a/llvm/lib/Transforms/Obfuscation/Utils.cpp b/llvm/lib/Transforms/Obfuscation/Utils.cpp
 new file mode 100644
-index 000000000000..357c1f0030d1
+index 000000000000..dfb8c8c2710c
 --- /dev/null
 +++ b/llvm/lib/Transforms/Obfuscation/Utils.cpp
 @@ -0,0 +1,172 @@
 +#include "llvm/Transforms/Obfuscation/Utils.h"
++#include "llvm/IR/Constants.h"
 +#include "llvm/IR/Module.h"
 +#include "llvm/Support/raw_ostream.h"
 +#include <sstream>
@@ -3998,47 +3927,45 @@ index 000000000000..357c1f0030d1
 +  // Get annotation variable
 +  auto *glob = f->getParent()->getGlobalVariable("llvm.global.annotations");
 +
-+  if (glob == NULL) return "";
++  if (glob == NULL)
++    return "";
 +
 +  // Get the array
-+  auto *ca = dyn_cast<ConstantArray>(glob->getInitializer());
-+  if (!ca) return "";
++  auto *ca = cast<ConstantArray>(glob->getOperand(0));
++  if (!ca)
++    return "";
 +
-+  for (unsigned i = 0; i < ca->getNumOperands(); ++i) {
++  for (Value *Op : ca->operands()) {
 +    // Get the struct
-+    auto *structAn = dyn_cast<ConstantStruct>(ca->getOperand(i));
-+    if (!structAn) continue;
++    auto *structAn = cast<ConstantStruct>(Op);
 +
-+    auto *expr = dyn_cast<ConstantExpr>(structAn->getOperand(0));
-+    if (!expr) continue;
++    auto *AnnotatedVar = structAn->getOperand(0)->stripPointerCasts();
++    if (AnnotatedVar != f)
++      continue;
 +
-+    // If it's a bitcast we can check if the annotation is concerning
-+    // the current function
-+    if (expr->getOpcode() != Instruction::BitCast ||
-+        expr->getOperand(0) != f) continue;
-+
-+    auto *note = cast<ConstantExpr>(structAn->getOperand(1));
-+    // If it's a GetElementPtr, that means we found the variable
-+    // containing the annotations
-+    if (note->getOpcode() != Instruction::GetElementPtr) continue;
-+
-+    auto *annoteStr = dyn_cast<GlobalVariable>(note->getOperand(0));
-+    if (!annoteStr) continue;
++    auto *annoteStr =
++        cast<GlobalVariable>(structAn->getOperand(1)->stripPointerCasts());
++    if (!annoteStr)
++      continue;
 +
 +    auto *data = dyn_cast<ConstantDataSequential>(annoteStr->getInitializer());
-+    if (!data) continue;
++    if (!data)
++      continue;
 +
-+    if (!data->isString()) continue;
++    if (!data->isString())
++      continue;
 +
 +    auto attr_pos = static_cast<std::size_t>(-1);
 +    auto attribute = data->getAsString();
-+    while (true){
++    while (true) {
 +      if (attr_pos != std::string::npos)
 +        attr_pos = attribute.find(attr, attr_pos + attr.size());
 +      else
 +        attr_pos = attribute.find(attr);
-+      if (attr_pos == std::string::npos) break;
-+      if (attr_pos != 0 && !std::isspace(attribute[attr_pos - 1])) continue;
++      if (attr_pos == std::string::npos)
++        break;
++      if (attr_pos != 0 && !std::isspace(attribute[attr_pos - 1]))
++        continue;
 +      if (attr_pos + attr.size() < attribute.size() &&
 +          !std::isspace(attribute[attr_pos + attr.size()]) &&
 +          attribute[attr_pos + attr.size()] != '=' &&
@@ -4046,15 +3973,16 @@ index 000000000000..357c1f0030d1
 +        continue;
 +
 +      auto assign = attribute.find('=');
-+      if (assign != std::string::npos){
++      if (assign != std::string::npos) {
 +        auto value = assign + 1;
 +        while (std::isspace(attribute[value]))
 +          ++value;
 +        auto end = value + 1;
-+        while (end < attribute.size() && !std::isspace(attribute[end]) && attribute[end] != '\0')
++        while (end < attribute.size() && !std::isspace(attribute[end]) &&
++               attribute[end] != '\0')
 +          ++end;
 +        return attribute.substr(value, end - value);
-+     } else
++      } else
 +        return "1";
 +    }
 +  }
