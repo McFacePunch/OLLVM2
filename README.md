@@ -2,6 +2,8 @@ To get obfuscator select branch what version you want
 
 Current version: [release/14.x](https://github.com/sr-tream/obfuscator/tree/release/14.x)
 
+Next version: [main](https://github.com/sr-tream/obfuscator/tree/main) (llvm 15.0)
+
 # Usage
 
 ## How to apply obfuscation
@@ -45,7 +47,11 @@ With this obfuscation may break exception handling!
 - `bcf_loop=3` - if the pass is activated, applies it 3 times on a function. Default: 1
 - `bcf_prob=40` - if the pass is activated, a basic bloc will be obfuscated with a probability of 40%. Default: 30
 
+#### String obfuscator
 
+Very simple xor (for llvm15 cesar+xor) string obfuscation. Applied only via command line
+
+- `sobf` - activate string obfuscator pass
 
 # Integrate to Android NDK
 
