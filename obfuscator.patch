@@ -56,7 +56,7 @@ new file mode 100644
 index 000000000000..1994ec002b90
 --- /dev/null
 +++ b/llvm/include/llvm/Transforms/Obfuscation/CryptoUtils.h
-@@ -0,0 +1,145 @@
+@@ -0,0 +1,272 @@
 +//===- CryptoUtils.h - Cryptographically Secure Pseudo-Random Generator ---===//
 +//
 +//                     The LLVM Compiler Infrastructure
@@ -135,6 +135,13 @@ index 000000000000..1994ec002b90
 +#else
 +#define ENDIAN_32BITWORD
 +#endif
++
++#elif defined( __arm ) || defined( __arm__ ) || ( defined( __ARM_ARCH ) && __ARM_ARCH == 4 )
++
++#ifndef ENDIAN_LITTLE
++#define ENDIAN_LITTLE
++#endif
++#define ENDIAN_32BITWORD
 +
 +#endif
 +
