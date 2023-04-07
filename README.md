@@ -1,10 +1,11 @@
 To get obfuscator select branch what version you want
 
-Current version: [release/15.x](https://github.com/sr-tream/obfuscator/tree/release/15.x)
+Current version: [main](https://github.com/sr-tream/obfuscator/tree/main) (llvm 16.0)
 
-Next version: [main](https://github.com/sr-tream/obfuscator/tree/main) (llvm 16.0)
+Previous versions: 
 
-Previous version: [release/14.x](https://github.com/sr-tream/obfuscator/tree/release/14.x)
+- [release/15.x](https://github.com/sr-tream/obfuscator/tree/release/15.x)
+- [release/14.x](https://github.com/sr-tream/obfuscator/tree/release/14.x)
 
 # Usage
 
