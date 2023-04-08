@@ -3119,7 +3119,7 @@ index 000000000000..14747833fb2e
 +}
 diff --git a/llvm/lib/Transforms/Obfuscation/StringObfuscation.cpp b/llvm/lib/Transforms/Obfuscation/StringObfuscation.cpp
 new file mode 100755
-index 000000000000..3b554743a7a3
+index 000000000000..9f4bd4a10b26
 --- /dev/null
 +++ b/llvm/lib/Transforms/Obfuscation/StringObfuscation.cpp
 @@ -0,0 +1,229 @@
@@ -3305,7 +3305,7 @@ index 000000000000..3b554743a7a3
 +                                Value* indexList[2] = {ConstantInt::get(variable->getType(), 0), variable};
 +                                Value *const_key=builder.getInt8(key);
 +                                
-+                                Value *GEP=builder.CreateGEP(gvar->getType()->getScalarType()->getPointerElementType(),gvar,ArrayRef<Value*>(indexList, 2),"arrayIdx");
++                                Value *GEP=builder.CreateGEP(gvar->getValueType()->getScalarType(),gvar,ArrayRef<Value*>(indexList, 2),"arrayIdx");
 +                                LoadInst *loadElement=builder.CreateLoad(GEP->getType()->getScalarType()->getPointerElementType(),GEP,false);
 +                                loadElement->setAlignment(Align(1));
 +                                //errs()<<"Type: "<<*loadElement<<"\n";
