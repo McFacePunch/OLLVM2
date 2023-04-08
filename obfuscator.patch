@@ -627,7 +627,7 @@ index 6b91c8494f39..916042f8d53a 100644
    MPM.add(createCFGSimplificationPass(
 diff --git a/llvm/lib/Transforms/Obfuscation/BogusControlFlow.cpp b/llvm/lib/Transforms/Obfuscation/BogusControlFlow.cpp
 new file mode 100644
-index 000000000000..d6774d3e6a80
+index 000000000000..d2f957711736
 --- /dev/null
 +++ b/llvm/lib/Transforms/Obfuscation/BogusControlFlow.cpp
 @@ -0,0 +1,701 @@
@@ -1268,8 +1268,8 @@ index 000000000000..d6774d3e6a80
 +    for (std::vector<Instruction *>::iterator i = toEdit.begin();
 +         i != toEdit.end(); ++i) {
 +      // if y < 10 || x*(x+1) % 2 == 0
-+      opX = new LoadInst(x->getType()->getPointerElementType(), (Value *)x, "", (*i));
-+      opY = new LoadInst(y->getType()->getPointerElementType(), (Value *)y, "", (*i));
++      opX = new LoadInst(x->getValueType(), (Value *)x, "", (*i));
++      opY = new LoadInst(y->getValueType(), (Value *)y, "", (*i));
 +
 +      op = BinaryOperator::Create(
 +          Instruction::Sub, (Value *)opX,
@@ -2612,10 +2612,10 @@ index 000000000000..baa49168d6f6
 +}
 diff --git a/llvm/lib/Transforms/Obfuscation/Flattening.cpp b/llvm/lib/Transforms/Obfuscation/Flattening.cpp
 new file mode 100644
-index 000000000000..2fd31bc69494
+index 000000000000..f84342fcaae4
 --- /dev/null
 +++ b/llvm/lib/Transforms/Obfuscation/Flattening.cpp
-@@ -0,0 +1,257 @@
+@@ -0,0 +1,263 @@
 +//===- Flattening.cpp - Flattening Obfuscation pass------------------------===//
 +//
 +//                     The LLVM Compiler Infrastructure
@@ -2631,16 +2631,16 @@ index 000000000000..2fd31bc69494
 +
 +#include "llvm/Transforms/Obfuscation/Flattening.h"
 +#include "llvm/IR/Constants.h"
++#include "llvm/InitializePasses.h"
 +#include "llvm/Transforms/Obfuscation/CryptoUtils.h"
 +#include "llvm/Transforms/Utils.h"
-+#include "llvm/InitializePasses.h"
 +
 +#define DEBUG_TYPE "flattening"
 +
 +using namespace llvm;
 +
 +static cl::opt<bool> FlatteningArg("fla", cl::init(false),
-+                                cl::desc("Enable the flattening pass"));
++                                   cl::desc("Enable the flattening pass"));
 +
 +// Stats
 +STATISTIC(Flattened, "Functions flattened");
@@ -2672,7 +2672,8 @@ index 000000000000..2fd31bc69494
 +  return false;
 +}
 +
-+PreservedAnalyses FlatteningPass::run(Function &F, FunctionAnalysisManager &AM){
++PreservedAnalyses FlatteningPass::run(Function &F,
++                                      FunctionAnalysisManager &AM) {
 +  Flattening fla;
 +  fla.runOnFunction(F);
 +
@@ -2693,8 +2694,9 @@ index 000000000000..2fd31bc69494
 +  // END OF SCRAMBLER
 +
 +#if LLVM_VERSION_MAJOR >= 9
-+    // >=9.0, LowerSwitchPass depends on LazyValueInfoWrapperPass, which cause AssertError.
-+    // So I move LowerSwitchPass into register function, just before FlatteningPass.
++  // >=9.0, LowerSwitchPass depends on LazyValueInfoWrapperPass, which cause
++  // AssertError. So I move LowerSwitchPass into register function, just before
++  // FlatteningPass.
 +#else
 +  // Lower switch
 +  FunctionPass *lower = createLowerSwitchPass();
@@ -2704,6 +2706,9 @@ index 000000000000..2fd31bc69494
 +  // Save all original BB
 +  for (Function::iterator i = f->begin(); i != f->end(); ++i) {
 +    BasicBlock *tmp = &*i;
++    if (tmp->isEHPad() || tmp->isLandingPad()) {
++      errs() << "Broke catch block(s) in function " << f->getName() << " - you must disable flattening obfuscation to fix it!\n";
++    }
 +    origBB.push_back(tmp);
 +
 +    BasicBlock *bb = &*i;
@@ -2758,7 +2763,8 @@ index 000000000000..2fd31bc69494
 +  loopEntry = BasicBlock::Create(f->getContext(), "loopEntry", f, insert);
 +  loopEnd = BasicBlock::Create(f->getContext(), "loopEnd", f, insert);
 +
-+  load = new LoadInst(switchVar->getType()->getPointerElementType(), switchVar, "switchVar", loopEntry);
++  load = new LoadInst(switchVar->getAllocatedType(), switchVar,
++                      "switchVar", loopEntry);
 +
 +  // Move first BB on top
 +  insert->moveBefore(loopEntry);
@@ -2793,7 +2799,7 @@ index 000000000000..2fd31bc69494
 +    numCase = cast<ConstantInt>(ConstantInt::get(
 +        switchI->getCondition()->getType(),
 +        llvm::cryptoutils->scramble32(switchI->getNumCases(), scrambling_key)));
-+      switchI->addCase(numCase, i);
++    switchI->addCase(numCase, i);
 +  }
 +
 +  // Recalculate switchVar
@@ -2956,10 +2962,10 @@ index 000000000000..0a6bf1ddcc42
 +
 diff --git a/llvm/lib/Transforms/Obfuscation/SplitBasicBlocks.cpp b/llvm/lib/Transforms/Obfuscation/SplitBasicBlocks.cpp
 new file mode 100644
-index 000000000000..9a692dcb73fb
+index 000000000000..14747833fb2e
 --- /dev/null
 +++ b/llvm/lib/Transforms/Obfuscation/SplitBasicBlocks.cpp
-@@ -0,0 +1,152 @@
+@@ -0,0 +1,151 @@
 +//===- SplitBasicBlock.cpp - SplitBasicBlokc Obfuscation pass--------------===//
 +//
 +//                     The LLVM Compiler Infrastructure
@@ -2985,7 +2991,7 @@ index 000000000000..9a692dcb73fb
 +STATISTIC(Split, "Basicblock splitted");
 +
 +static cl::opt<bool> SplitFlag("split", cl::init(false),
-+                           cl::desc("Enable basic block splitting"));
++                               cl::desc("Enable basic block splitting"));
 +
 +static cl::opt<int> SplitNum("split_num", cl::init(2),
 +                             cl::desc("Split <split_num> time each BB"));
@@ -3007,11 +3013,10 @@ index 000000000000..9a692dcb73fb
 +char SplitBasicBlock::ID = 0;
 +static RegisterPass<SplitBasicBlock> X("splitbbl", "BasicBlock splitting");
 +
-+Pass *llvm::createSplitBasicBlock() {
-+  return new SplitBasicBlock();
-+}
++Pass *llvm::createSplitBasicBlock() { return new SplitBasicBlock(); }
 +
-+PreservedAnalyses SplitBasicBlockPass::run(Function &F, FunctionAnalysisManager &AM){
++PreservedAnalyses SplitBasicBlockPass::run(Function &F,
++                                           FunctionAnalysisManager &AM) {
 +  SplitBasicBlock split;
 +  split.runOnFunction(F);
 +  return PreservedAnalyses::none();
@@ -3044,7 +3049,6 @@ index 000000000000..9a692dcb73fb
 +
 +void SplitBasicBlock::split(Function *f) {
 +  std::vector<BasicBlock *> origBB;
-+  int splitN = SplitNum;
 +
 +  // Save all basic blocks
 +  for (Function::iterator I = f->begin(), IE = f->end(); I != IE; ++I) {
@@ -3055,6 +3059,7 @@ index 000000000000..9a692dcb73fb
 +                                           IE = origBB.end();
 +       I != IE; ++I) {
 +    BasicBlock *curr = *I;
++    int splitN = SplitNum;
 +
 +    // No need to split a 1 inst bb
 +    // Or ones containing a PHI node
@@ -3063,7 +3068,7 @@ index 000000000000..9a692dcb73fb
 +    }
 +
 +    // Check splitN and current BB size
-+    if ((size_t)splitN > curr->size()) {
++    if ((size_t)splitN >= curr->size()) {
 +      splitN = curr->size() - 1;
 +    }
 +
@@ -3114,7 +3119,7 @@ index 000000000000..9a692dcb73fb
 +}
 diff --git a/llvm/lib/Transforms/Obfuscation/StringObfuscation.cpp b/llvm/lib/Transforms/Obfuscation/StringObfuscation.cpp
 new file mode 100755
-index 000000000000..d961b85aae45
+index 000000000000..3b554743a7a3
 --- /dev/null
 +++ b/llvm/lib/Transforms/Obfuscation/StringObfuscation.cpp
 @@ -0,0 +1,229 @@
@@ -3189,7 +3194,7 @@ index 000000000000..d961b85aae45
 +
 +                                        // Duplicate global variable
 +                                        GlobalVariable *dynGV = new GlobalVariable(M,
-+                                                                                  gv->getType()->getPointerElementType(),
++                                                                                  gv->getValueType(),
 +                                                                                  !(gv->isConstant()), gv->getLinkage(),
 +                                                                                  (Constant*) 0, gv->getName(),
 +                                                                                  (GlobalVariable*) 0,
