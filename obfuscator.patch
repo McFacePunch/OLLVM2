@@ -1,10 +1,10 @@
 diff --git a/llvm/CMakeLists.txt b/llvm/CMakeLists.txt
-index 1819151f3d63..23a1d1ac55f0 100644
+index 3a591b112f55..3388a6786ed7 100644
 --- a/llvm/CMakeLists.txt
 +++ b/llvm/CMakeLists.txt
-@@ -556,7 +556,7 @@ endif()
- option(LLVM_ENABLE_LOCAL_SUBMODULE_VISIBILITY "Compile with -fmodules-local-submodule-visibility." ON)
+@@ -573,7 +573,7 @@ option(LLVM_ENABLE_LOCAL_SUBMODULE_VISIBILITY "Compile with -fmodules-local-subm
  option(LLVM_ENABLE_LIBCXX "Use libc++ if available." OFF)
+ option(LLVM_ENABLE_LLVM_LIBC "Set to on to link all LLVM executables against LLVM libc, assuming it is accessible by the host compiler." OFF)
  option(LLVM_STATIC_LINK_CXX_STDLIB "Statically link the standard library." OFF)
 -option(LLVM_ENABLE_LLD "Use lld as C and C++ linker." OFF)
 +option(LLVM_ENABLE_LLD "Use lld as C and C++ linker." ON)
@@ -393,10 +393,10 @@ index 000000000000..36c69515ae66
 +
 +#endif
 diff --git a/llvm/lib/Passes/PassBuilder.cpp b/llvm/lib/Passes/PassBuilder.cpp
-index e251d56463a3..161bdfe4284f 100644
+index d0cbbcc0e310..30a672e9fd69 100644
 --- a/llvm/lib/Passes/PassBuilder.cpp
 +++ b/llvm/lib/Passes/PassBuilder.cpp
-@@ -257,6 +257,12 @@
+@@ -262,6 +262,12 @@
  #include "llvm/Transforms/Vectorize/VectorCombine.h"
  #include <optional>
  
@@ -410,10 +410,10 @@ index e251d56463a3..161bdfe4284f 100644
  
  static const Regex DefaultAliasRegex(
 diff --git a/llvm/lib/Passes/PassBuilderPipelines.cpp b/llvm/lib/Passes/PassBuilderPipelines.cpp
-index 0d074951cffc..288ffecb7d92 100644
+index 660cb2e974d7..1642ca67de78 100644
 --- a/llvm/lib/Passes/PassBuilderPipelines.cpp
 +++ b/llvm/lib/Passes/PassBuilderPipelines.cpp
-@@ -128,6 +128,12 @@
+@@ -133,6 +133,12 @@
  #include "llvm/Transforms/Vectorize/SLPVectorizer.h"
  #include "llvm/Transforms/Vectorize/VectorCombine.h"
  
@@ -426,9 +426,9 @@ index 0d074951cffc..288ffecb7d92 100644
  using namespace llvm;
  
  static cl::opt<InliningAdvisorMode> UseInlineAdvisor(
-@@ -279,6 +285,15 @@ static cl::opt<AttributorRunOption> AttributorRun(
-                clEnumValN(AttributorRunOption::NONE, "none",
-                           "disable attributor runs")));
+@@ -274,6 +280,15 @@ cl::opt<bool> EnableMemProfContextDisambiguation(
+     "enable-memprof-context-disambiguation", cl::init(false), cl::Hidden,
+     cl::ZeroOrMore, cl::desc("Enable MemProf context disambiguation"));
  
 +// Flags for obfuscation
 +#if defined(LLVM_ENABLE_NEW_PASS_MANAGER) && LLVM_ENABLE_NEW_PASS_MANAGER == 1
@@ -442,7 +442,7 @@ index 0d074951cffc..288ffecb7d92 100644
  PipelineTuningOptions::PipelineTuningOptions() {
    LoopInterleaving = true;
    LoopVectorization = true;
-@@ -291,6 +306,17 @@ PipelineTuningOptions::PipelineTuningOptions() {
+@@ -287,6 +302,17 @@ PipelineTuningOptions::PipelineTuningOptions() {
    MergeFunctions = EnableMergeFunctions;
    InlinerThreshold = -1;
    EagerlyInvalidateAnalyses = EnableEagerlyInvalidateAnalyses;
@@ -460,8 +460,8 @@ index 0d074951cffc..288ffecb7d92 100644
  }
  
  namespace llvm {
-@@ -1286,6 +1312,13 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
-     C(MPM, Level);
+@@ -1327,6 +1353,13 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
+   invokeOptimizerEarlyEPCallbacks(MPM, Level);
  
    FunctionPassManager OptimizePM;
 +
@@ -474,7 +474,7 @@ index 0d074951cffc..288ffecb7d92 100644
    OptimizePM.addPass(Float2IntPass());
    OptimizePM.addPass(LowerConstantIntrinsicsPass());
  
-@@ -1350,10 +1383,15 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
+@@ -1395,10 +1428,15 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
    OptimizePM.addPass(
        SimplifyCFGPass(SimplifyCFGOptions().convertSwitchRangeToICmp(true)));
  
@@ -487,11 +487,11 @@ index 0d074951cffc..288ffecb7d92 100644
  
 +  MPM.addPass(StringObfuscationNewPass());
 +
-   for (auto &C : OptimizerLastEPCallbacks)
-     C(MPM, Level);
+   invokeOptimizerLastEPCallbacks(MPM, Level);
  
+   // Split out cold code. Splitting is done late to avoid hiding context from
 diff --git a/llvm/lib/Passes/PassRegistry.def b/llvm/lib/Passes/PassRegistry.def
-index 10af4160c545..9ae02d7dde91 100644
+index e10dc995c493..34f85aabfd0b 100644
 --- a/llvm/lib/Passes/PassRegistry.def
 +++ b/llvm/lib/Passes/PassRegistry.def
 @@ -127,6 +127,7 @@ MODULE_PASS("sanmd-module", SanitizerBinaryMetadataPass())
@@ -502,7 +502,7 @@ index 10af4160c545..9ae02d7dde91 100644
  #undef MODULE_PASS
  
  #ifndef MODULE_PASS_WITH_PARAMS
-@@ -297,6 +298,10 @@ FUNCTION_PASS("make-guards-explicit", MakeGuardsExplicitPass())
+@@ -324,6 +325,10 @@ FUNCTION_PASS("make-guards-explicit", MakeGuardsExplicitPass())
  FUNCTION_PASS("gvn-hoist", GVNHoistPass())
  FUNCTION_PASS("gvn-sink", GVNSinkPass())
  FUNCTION_PASS("helloworld", HelloWorldPass())
@@ -523,7 +523,7 @@ index dda5f6de11e3..a001a7ca9b48 100644
  add_subdirectory(CFGuard)
 +add_subdirectory(Obfuscation)
 diff --git a/llvm/lib/Transforms/IPO/CMakeLists.txt b/llvm/lib/Transforms/IPO/CMakeLists.txt
-index e68208833f3f..b8a4bc1e6e07 100644
+index 034f1587ae8d..5c73dfe3c5c2 100644
 --- a/llvm/lib/Transforms/IPO/CMakeLists.txt
 +++ b/llvm/lib/Transforms/IPO/CMakeLists.txt
 @@ -72,4 +72,5 @@ add_llvm_component_library(LLVMipo
@@ -532,99 +532,6 @@ index e68208833f3f..b8a4bc1e6e07 100644
    Instrumentation
 +  Obfuscation
    )
-diff --git a/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp b/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp
-index 6b91c8494f39..916042f8d53a 100644
---- a/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp
-+++ b/llvm/lib/Transforms/IPO/PassManagerBuilder.cpp
-@@ -39,8 +39,24 @@
- #include "llvm/Transforms/Utils.h"
- #include "llvm/Transforms/Vectorize.h"
- 
-+#include "llvm/Transforms/Obfuscation/BogusControlFlow.h"
-+#include "llvm/Transforms/Obfuscation/Flattening.h"
-+#include "llvm/Transforms/Obfuscation/Split.h"
-+#include "llvm/Transforms/Obfuscation/Substitution.h"
-+#include "llvm/Transforms/Obfuscation/StringObfuscation.h"
-+#include "llvm/Transforms/Obfuscation/CryptoUtils.h"
-+
- using namespace llvm;
- 
-+// Flags for obfuscation
-+#if !defined(LLVM_ENABLE_NEW_PASS_MANAGER) || LLVM_ENABLE_NEW_PASS_MANAGER == 0
-+static cl::opt<std::string> AesSeed("aesSeed", cl::init(""),
-+                                    cl::desc("seed for the AES-CTR PRNG"));
-+
-+static cl::opt<std::string> Seed("seed", cl::init(""),
-+                           cl::desc("seed for the random"));
-+#endif
-+
- PassManagerBuilder::PassManagerBuilder() {
-     OptLevel = 2;
-     SizeLevel = 0;
-@@ -59,6 +75,22 @@ PassManagerBuilder::PassManagerBuilder() {
-     MergeFunctions = false;
-     DivergentTarget = false;
-     CallGraphProfile = true;
-+
-+    // Initialization of the global cryptographically
-+    // secure pseudo-random generator
-+#if !defined(LLVM_ENABLE_NEW_PASS_MANAGER) || LLVM_ENABLE_NEW_PASS_MANAGER == 0
-+    if(!AesSeed.empty()) {
-+        if(!llvm::cryptoutils->prng_seed(AesSeed.c_str())) {
-+          exit(1);
-+        }
-+    }
-+
-+    //random generator
-+    if(!Seed.empty()) {
-+        if(!llvm::cryptoutils->prng_seed(Seed.c_str()))
-+          exit(1);
-+    }
-+#endif
- }
- 
- PassManagerBuilder::~PassManagerBuilder() {
-@@ -287,13 +319,21 @@ void PassManagerBuilder::addVectorPasses(legacy::PassManagerBase &PM,
-     PM.add(createInstructionCombiningPass());
- }
- 
--void PassManagerBuilder::populateModulePassManager(
-+void PassManagerBuilder::populateModulePassManager( // PassBuilder::buildModuleOptimizationPipeline - in new PM!
-     legacy::PassManagerBase &MPM) {
-   MPM.add(createAnnotation2MetadataLegacyPass());
- 
-   // Allow forcing function attributes as a debugging and tuning aid.
-   MPM.add(createForceFunctionAttrsLegacyPass());
- 
-+  MPM.add(createSplitBasicBlock());
-+  MPM.add(createBogus());
-+  #if LLVM_VERSION_MAJOR >= 9
-+    MPM.add(createLowerSwitchPass());
-+  #endif
-+  MPM.add(createFlattening());
-+  MPM.add(createStringObfuscation(false));
-+
-   // If all optimizations are disabled, just run the always-inline pass and,
-   // if enabled, the function merging pass.
-   if (OptLevel == 0) {
-@@ -384,6 +424,8 @@ void PassManagerBuilder::populateModulePassManager(
-     MPM.add(createGlobalOptimizerPass());
-     MPM.add(createGlobalDCEPass());
-   }
-+  
-+  MPM.add(createSubstitution());
- 
-   // We add a fresh GlobalsModRef run at this point. This is particularly
-   // useful as the above will have inlined, DCE'ed, and function-attr
-@@ -444,6 +486,8 @@ void PassManagerBuilder::populateModulePassManager(
-   // flattening of blocks.
-   MPM.add(createDivRemPairsPass());
- 
-+  MPM.add(createSubstitution());
-+
-   // LoopSink (and other loop passes since the last simplifyCFG) might have
-   // resulted in single-entry-single-exit or empty blocks. Clean up the CFG.
-   MPM.add(createCFGSimplificationPass(
 diff --git a/llvm/lib/Transforms/Obfuscation/BogusControlFlow.cpp b/llvm/lib/Transforms/Obfuscation/BogusControlFlow.cpp
 new file mode 100644
 index 000000000000..f669b2c5bbcd
