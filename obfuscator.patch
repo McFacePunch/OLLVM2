@@ -1,8 +1,8 @@
 diff --git a/llvm/CMakeLists.txt b/llvm/CMakeLists.txt
-index 79de9eb2e3e7..eb02b11941da 100644
+index c2fb77d5a371..5ecd674a0c18 100644
 --- a/llvm/CMakeLists.txt
 +++ b/llvm/CMakeLists.txt
-@@ -573,7 +573,7 @@ option(LLVM_ENABLE_LOCAL_SUBMODULE_VISIBILITY "Compile with -fmodules-local-subm
+@@ -596,7 +596,7 @@ option(LLVM_ENABLE_LOCAL_SUBMODULE_VISIBILITY "Compile with -fmodules-local-subm
  option(LLVM_ENABLE_LIBCXX "Use libc++ if available." OFF)
  option(LLVM_ENABLE_LLVM_LIBC "Set to on to link all LLVM executables against LLVM libc, assuming it is accessible by the host compiler." OFF)
  option(LLVM_STATIC_LINK_CXX_STDLIB "Statically link the standard library." OFF)
@@ -393,10 +393,10 @@ index 000000000000..36c69515ae66
 +
 +#endif
 diff --git a/llvm/lib/Passes/PassBuilder.cpp b/llvm/lib/Passes/PassBuilder.cpp
-index d0cbbcc0e310..30a672e9fd69 100644
+index 000594f0e7f4..5537956b5f18 100644
 --- a/llvm/lib/Passes/PassBuilder.cpp
 +++ b/llvm/lib/Passes/PassBuilder.cpp
-@@ -262,6 +262,12 @@
+@@ -290,6 +290,12 @@
  #include "llvm/Transforms/Vectorize/VectorCombine.h"
  #include <optional>
  
@@ -410,10 +410,10 @@ index d0cbbcc0e310..30a672e9fd69 100644
  
  static const Regex DefaultAliasRegex(
 diff --git a/llvm/lib/Passes/PassBuilderPipelines.cpp b/llvm/lib/Passes/PassBuilderPipelines.cpp
-index 660cb2e974d7..1642ca67de78 100644
+index 6ede86382912..3a7415476968 100644
 --- a/llvm/lib/Passes/PassBuilderPipelines.cpp
 +++ b/llvm/lib/Passes/PassBuilderPipelines.cpp
-@@ -133,6 +133,12 @@
+@@ -136,6 +136,12 @@
  #include "llvm/Transforms/Vectorize/SLPVectorizer.h"
  #include "llvm/Transforms/Vectorize/VectorCombine.h"
  
@@ -426,9 +426,9 @@ index 660cb2e974d7..1642ca67de78 100644
  using namespace llvm;
  
  static cl::opt<InliningAdvisorMode> UseInlineAdvisor(
-@@ -274,6 +280,15 @@ cl::opt<bool> EnableMemProfContextDisambiguation(
-     "enable-memprof-context-disambiguation", cl::init(false), cl::Hidden,
-     cl::ZeroOrMore, cl::desc("Enable MemProf context disambiguation"));
+@@ -285,6 +291,15 @@ cl::opt<bool> EnableMemProfContextDisambiguation(
+ extern cl::opt<bool> EnableInferAlignmentPass;
+ } // namespace llvm
  
 +// Flags for obfuscation
 +#if defined(LLVM_ENABLE_NEW_PASS_MANAGER) && LLVM_ENABLE_NEW_PASS_MANAGER == 1
@@ -442,7 +442,7 @@ index 660cb2e974d7..1642ca67de78 100644
  PipelineTuningOptions::PipelineTuningOptions() {
    LoopInterleaving = true;
    LoopVectorization = true;
-@@ -287,6 +302,17 @@ PipelineTuningOptions::PipelineTuningOptions() {
+@@ -298,6 +313,17 @@ PipelineTuningOptions::PipelineTuningOptions() {
    MergeFunctions = EnableMergeFunctions;
    InlinerThreshold = -1;
    EagerlyInvalidateAnalyses = EnableEagerlyInvalidateAnalyses;
@@ -460,7 +460,7 @@ index 660cb2e974d7..1642ca67de78 100644
  }
  
  namespace llvm {
-@@ -1327,6 +1353,13 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
+@@ -1363,6 +1389,13 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
    invokeOptimizerEarlyEPCallbacks(MPM, Level);
  
    FunctionPassManager OptimizePM;
@@ -471,10 +471,10 @@ index 660cb2e974d7..1642ca67de78 100644
 +  OptimizePM.addPass(FlatteningPass());
 +  OptimizePM.addPass(SubstitutionPass());
 +
-   OptimizePM.addPass(Float2IntPass());
-   OptimizePM.addPass(LowerConstantIntrinsicsPass());
- 
-@@ -1395,10 +1428,15 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
+   // Scheduling LoopVersioningLICM when inlining is over, because after that
+   // we may see more accurate aliasing. Reason to run this late is that too
+   // early versioning may prevent further inlining due to increase of code
+@@ -1446,10 +1479,15 @@ PassBuilder::buildModuleOptimizationPipeline(OptimizationLevel Level,
    OptimizePM.addPass(
        SimplifyCFGPass(SimplifyCFGOptions().convertSwitchRangeToICmp(true)));
  
@@ -491,18 +491,18 @@ index 660cb2e974d7..1642ca67de78 100644
  
    // Split out cold code. Splitting is done late to avoid hiding context from
 diff --git a/llvm/lib/Passes/PassRegistry.def b/llvm/lib/Passes/PassRegistry.def
-index e10dc995c493..34f85aabfd0b 100644
+index e59795c7b084..4484fcab0b0c 100644
 --- a/llvm/lib/Passes/PassRegistry.def
 +++ b/llvm/lib/Passes/PassRegistry.def
-@@ -127,6 +127,7 @@ MODULE_PASS("sanmd-module", SanitizerBinaryMetadataPass())
- MODULE_PASS("memprof-module", ModuleMemProfilerPass())
- MODULE_PASS("poison-checking", PoisonCheckingPass())
+@@ -115,6 +115,7 @@ MODULE_PASS("print<inline-advisor>", InlineAdvisorAnalysisPrinterPass(dbgs()))
+ MODULE_PASS("print<module-debuginfo>", ModuleDebugInfoPrinterPass(dbgs()))
+ MODULE_PASS("pseudo-probe", SampleProfileProbePass(TM))
  MODULE_PASS("pseudo-probe-update", PseudoProbeUpdatePass())
 +MODULE_PASS("obf-str", StringObfuscationNewPass())
- #undef MODULE_PASS
- 
- #ifndef MODULE_PASS_WITH_PARAMS
-@@ -324,6 +325,10 @@ FUNCTION_PASS("make-guards-explicit", MakeGuardsExplicitPass())
+ MODULE_PASS("recompute-globalsaa", RecomputeGlobalsAAPass())
+ MODULE_PASS("rel-lookup-table-converter", RelLookupTableConverterPass())
+ MODULE_PASS("rewrite-statepoints-for-gc", RewriteStatepointsForGC())
+@@ -336,6 +337,10 @@ FUNCTION_PASS("guard-widening", GuardWideningPass())
  FUNCTION_PASS("gvn-hoist", GVNHoistPass())
  FUNCTION_PASS("gvn-sink", GVNSinkPass())
  FUNCTION_PASS("helloworld", HelloWorldPass())
@@ -510,18 +510,19 @@ index e10dc995c493..34f85aabfd0b 100644
 +FUNCTION_PASS("obf-sub", SubstitutionPass())
 +FUNCTION_PASS("obf-bcf", BogusControlFlowPass())
 +FUNCTION_PASS("obf-split", SplitBasicBlockPass())
+ FUNCTION_PASS("indirectbr-expand", IndirectBrExpandPass(TM))
  FUNCTION_PASS("infer-address-spaces", InferAddressSpacesPass())
- FUNCTION_PASS("instcombine", InstCombinePass())
- FUNCTION_PASS("instcount", InstCountPass())
+ FUNCTION_PASS("infer-alignment", InferAlignmentPass())
 diff --git a/llvm/lib/Transforms/CMakeLists.txt b/llvm/lib/Transforms/CMakeLists.txt
-index dda5f6de11e3..a001a7ca9b48 100644
+index 84a7e34147d0..26ab00f2cef6 100644
 --- a/llvm/lib/Transforms/CMakeLists.txt
 +++ b/llvm/lib/Transforms/CMakeLists.txt
-@@ -9,3 +9,4 @@ add_subdirectory(Hello)
+@@ -9,4 +9,5 @@ add_subdirectory(Hello)
  add_subdirectory(ObjCARC)
  add_subdirectory(Coroutines)
  add_subdirectory(CFGuard)
 +add_subdirectory(Obfuscation)
+ add_subdirectory(HipStdPar)
 diff --git a/llvm/lib/Transforms/IPO/CMakeLists.txt b/llvm/lib/Transforms/IPO/CMakeLists.txt
 index 034f1587ae8d..5c73dfe3c5c2 100644
 --- a/llvm/lib/Transforms/IPO/CMakeLists.txt
