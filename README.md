@@ -1,8 +1,10 @@
 To get obfuscator select branch what version you want
 
-Current version: [main](https://github.com/sr-tream/obfuscator/tree/main) (llvm 17.0)
+Current version: [main](https://github.com/sr-tream/obfuscator/tree/main) (llvm 18.x)
 
 Previous versions: 
+
+- [release/17.x](https://github.com/sr-tream/obfuscator/tree/release/17.x)
 
 - [release/16.x](https://github.com/sr-tream/obfuscator/tree/release/16.x)
 
