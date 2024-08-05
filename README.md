@@ -8,8 +8,12 @@ cd llvm-project
 git apply ../obfuscator.patch
 ```
 
-Now you can build `llvm-project` to get llvm with obfuscation.
+Now we can build `llvm-project` to get llvm with obfuscation.
 
+```
+cmake ../llvm -DCMAKE_BUILD_TYPE=Release
+make -j10
+```
 
 
 Also, to increase build speed you can rebuild only `opt` utility (because obfuscator add passes to optimization pipeline). And replace `opt` in you toolchain.
