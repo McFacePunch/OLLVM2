@@ -24,6 +24,8 @@ This will create a `./build` directory using ninja.
 
 Now either build all of llvm, or specify the tool like `opt`. All changes are contained within opt currently but this may change in the future.
 
+If build setup doesn't work due to lld missing, youre probably on a mac and used homebrew to install llvm. In this case add the following to your bashrz/zshrc `export PATH="$(brew --prefix llvm)/bin:$PATH"`
+
 ```
 cd ./build
 
